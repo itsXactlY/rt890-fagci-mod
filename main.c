@@ -14,7 +14,6 @@
  *     limitations under the License.
  */
 
-#include <at32f421.h>
 #include "app/radio.h"
 #include "app/uart.h"
 #include "driver/bk4819.h"
@@ -27,20 +26,21 @@
 #include "radio/data.h"
 #include "radio/hardware.h"
 #include "radio/settings.h"
-#include "task/am-fix.h"
 #include "task/alarm.h"
+#include "task/am-fix.h"
 #include "task/battery.h"
 #include "task/cursor.h"
 #include "task/encrypt.h"
+#include <at32f421.h>
 #ifdef ENABLE_FM_RADIO
-	#include "task/fmscanner.h"
+#include "task/fmscanner.h"
 #endif
 #include "task/idle.h"
 #include "task/incoming.h"
 #include "task/keys.h"
 #include "task/lock.h"
 #ifdef ENABLE_NOAA
-	#include "task/noaa.h"
+#include "task/noaa.h"
 #endif
 #include "task/ptt.h"
 #include "task/rssi.h"
@@ -55,59 +55,54 @@ extern const uint8_t StackVector[];
 
 void Main(void) __attribute__((noreturn));
 
-void _putchar(char c)
-{
-	UART_SendByte((uint8_t)c);
-}
+void _putchar(char c) { UART_SendByte((uint8_t)c); }
 
-void Main(void)
-{
+void Main(void) {
 
-	CRM_GetCoreClock();
-	SCB->VTOR = (uint32_t)StackVector;
-	DELAY_Init();
-	DELAY_WaitMS(200);
-	HARDWARE_Init();
-	RADIO_Init();
+  CRM_GetCoreClock();
+  SCB->VTOR = (uint32_t)StackVector;
+  DELAY_Init();
+  DELAY_WaitMS(200);
+  HARDWARE_Init();
+  RADIO_Init();
 
-	if (gSettings.DtmfState == DTMF_STATE_KILLED) {
-		DATA_ReceiverInit();
-	}
-	while (1) {
-		do {
-			while (!UART_IsRunning && gSettings.DtmfState != DTMF_STATE_KILLED) {
-				Task_VoicePlayer();
-				Task_CheckKeyPad();
-				Task_CheckSideKeys();
-				Task_UpdateScreen();
-				Task_BlinkCursor();
-				#ifdef ENABLE_AM_FIX
-				Task_AM_fix();
-				#endif
-				Task_Scanner();
-				Task_CheckPTT();
-				Task_CheckIncoming();
-				Task_CheckRSSI();
-				Task_CheckDisplayTimeout();
-				Task_Encrypt();
-				Task_CheckLockScreen();
-				Task_VoxUpdate();
-				Task_Idle();
-				Task_CheckBattery();
+  if (gSettings.DtmfState == DTMF_STATE_KILLED) {
+    DATA_ReceiverInit();
+  }
+  while (1) {
+    do {
+      while (!UART_IsRunning && gSettings.DtmfState != DTMF_STATE_KILLED) {
+        Task_VoicePlayer();
+        Task_CheckKeyPad();
+        Task_CheckSideKeys();
+        Task_UpdateScreen();
+        Task_BlinkCursor();
+#ifdef ENABLE_AM_FIX
+        Task_AM_fix();
+#endif
+        Task_Scanner();
+        Task_CheckPTT();
+        Task_CheckIncoming();
+        Task_CheckRSSI();
+        Task_CheckDisplayTimeout();
+        Task_Encrypt();
+        Task_CheckLockScreen();
+        Task_VoxUpdate();
+        Task_Idle();
+        Task_CheckBattery();
 #ifdef ENABLE_FM_RADIO
-				Task_CheckScannerFM();
+        Task_CheckScannerFM();
 #endif
 #ifdef ENABLE_NOAA
-				Task_CheckNOAA();
+        Task_CheckNOAA();
 #endif
-				Task_LocalAlarm();
-			}
-		} while (gSettings.DtmfState != DTMF_STATE_KILLED);
-		if (BK4819_ReadRegister(0x0C) & 0x0001U) {
-			DATA_ReceiverCheck();
-		}
-		DELAY_WaitMS(1);
-		STANDBY_BlinkGreen();
-	}
+        Task_LocalAlarm();
+      }
+    } while (gSettings.DtmfState != DTMF_STATE_KILLED);
+    if (BK4819_ReadRegister(0x0C) & 0x0001U) {
+      DATA_ReceiverCheck();
+    }
+    DELAY_WaitMS(10);
+    // STANDBY_BlinkGreen();
+  }
 }
-

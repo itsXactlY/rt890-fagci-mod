@@ -16,6 +16,7 @@
 
 #ifndef RADIO_SPECTRUM_H
 #define RADIO_SPECTRUM_H
+#include <stdint.h>
 
 enum {
 	STEPS_128,
