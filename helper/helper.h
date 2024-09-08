@@ -26,5 +26,16 @@ uint16_t TIMER_Calculate(uint16_t Setting);
 void SCREEN_TurnOn(void);
 void STANDBY_BlinkGreen(void);
 
+long long Clamp(long long v, long long min, long long max);
+int ConvertDomain(int aValue, int aMin, int aMax, int bMin, int bMax);
+
+int Mid(uint16_t *array, uint8_t n);
+int Min(uint16_t *array, uint8_t n);
+int Max(uint16_t *array, uint8_t n);
+uint16_t Mean(uint16_t *array, uint8_t n);
+uint16_t Std(uint16_t *data, uint8_t n);
+
+int16_t Rssi2DBm(uint16_t rssi);
+
 #endif
 

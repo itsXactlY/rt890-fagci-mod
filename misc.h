@@ -21,57 +21,77 @@
 #include <stdint.h>
 
 #ifndef ARRAY_SIZE
-	#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #endif
 
 enum SCREEN_Mode_t {
-	SCREEN_MAIN = 0,
-	SCREEN_MENU,
-	SCREEN_SETTING,
-	SCREEN_FREQ_DETECT,
+  SCREEN_MAIN = 0,
+  SCREEN_MENU,
+  SCREEN_SETTING,
+  SCREEN_FREQ_DETECT,
 #ifdef ENABLE_REGISTER_EDIT
-	SCREEN_REGEDIT,
+  SCREEN_REGEDIT,
 #endif
 #ifdef ENABLE_NOAA
-	SCREEN_NOAA,
+  SCREEN_NOAA,
 #endif
 };
 
 typedef enum SCREEN_Mode_t SCREEN_Mode_t;
 
 enum IDLE_Mode_t {
-	IDLE_MODE_OFF = 0,
-	IDLE_MODE_DUAL_STANDBY,
+  IDLE_MODE_OFF = 0,
+  IDLE_MODE_DUAL_STANDBY,
 #ifdef ENABLE_NOAA
-	IDLE_MODE_NOAA,
+  IDLE_MODE_NOAA,
 #endif
-	IDLE_MODE_SAVE,
+  IDLE_MODE_SAVE,
 };
 
 typedef enum IDLE_Mode_t IDLE_Mode_t;
 
 enum PTT_Lock_t {
-	PTT_LOCK_VOX = 0x01U,
-	PTT_LOCK_BATTERY = 0x02U,
-	PTT_LOCK_INCOMING = 0x04U,
-	PTT_LOCK_BUSY = 0x10U,
+  PTT_LOCK_VOX = 0x01U,
+  PTT_LOCK_BATTERY = 0x02U,
+  PTT_LOCK_INCOMING = 0x04U,
+  PTT_LOCK_BUSY = 0x10U,
 };
 
 typedef enum PTT_Lock_t PTT_Lock_t;
 
 enum {
-	BUSY_LOCK_OFF = 0U,
-	BUSY_LOCK_CARRIER,
-	BUSY_LOCK_CSS,
-	BUSY_LOCK_INVALID,
+  BUSY_LOCK_OFF = 0U,
+  BUSY_LOCK_CARRIER,
+  BUSY_LOCK_CSS,
+  BUSY_LOCK_INVALID,
 };
 
 enum {
-	RADIO_MODE_QUIET = 0U,
-	RADIO_MODE_INCOMING,
-	RADIO_MODE_RX,
-	RADIO_MODE_TX,
+  RADIO_MODE_QUIET = 0U,
+  RADIO_MODE_INCOMING,
+  RADIO_MODE_RX,
+  RADIO_MODE_TX,
 };
+
+typedef struct {
+  uint32_t f;
+  uint32_t firstTime;
+  uint32_t lastTimeCheck;
+  uint32_t lastTimeOpen;
+  uint32_t cd;
+  uint16_t ct;
+  uint16_t duration;
+  uint16_t rssi;
+  uint8_t noise;
+  bool open;
+  bool blacklist;
+  bool goodKnown;
+} Loot;
+
+typedef struct {
+  uint32_t start : 27;
+  uint32_t end : 27;
+} FRange;
 
 extern SCREEN_Mode_t gScreenMode;
 extern uint8_t gTxCodeType;
@@ -105,8 +125,10 @@ extern uint16_t gNoToneCounter;
 extern bool gFrequencyReverse;
 extern bool gManualScanDirection;
 extern bool gForceScan;
-extern uint32_t gScanStartFreqOrChannel;	// Frequency or channel to restore after scan
-extern uint32_t gScanLastRxFreqOrChannel;	// Last RX frequency or channel during scan
+extern uint32_t
+    gScanStartFreqOrChannel; // Frequency or channel to restore after scan
+extern uint32_t
+    gScanLastRxFreqOrChannel; // Last RX frequency or channel during scan
 extern uint8_t gSlot;
 extern char gString[32];
 extern char gBigString[40];
@@ -114,6 +136,5 @@ extern char gBigString[40];
 extern uint32_t SFLASH_Offsets[20];
 extern uint32_t SFLASH_FontOffsets[32];
 extern uint8_t gFlashBuffer[8192];
-
 
 #endif

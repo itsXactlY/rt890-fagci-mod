@@ -136,6 +136,7 @@ OBJS += ui/noaa.o
 endif
 OBJS += ui/version.o
 OBJS += ui/vfo.o
+OBJS += ui/spectrum.o
 OBJS += ui/welcome.o
 
 # Main

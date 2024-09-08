@@ -40,6 +40,9 @@ typedef enum BK4819_AF_Type_t BK4819_AF_Type_t;
 void OpenAudio(bool bIsNarrow, uint8_t gModulationType);
 uint16_t BK4819_ReadRegister(uint8_t Reg);
 uint16_t BK4819_GetRSSI();
+uint8_t BK4819_GetNoise(void);
+uint8_t BK4819_GetGlitch(void);
+uint8_t BK4819_GetSNR(void);
 void BK4819_WriteRegister(uint8_t Reg, uint16_t Data);
 
 void BK4819_Init(void);

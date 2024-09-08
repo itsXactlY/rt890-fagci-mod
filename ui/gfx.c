@@ -41,6 +41,7 @@ void DISPLAY_Fill(uint8_t X0, uint8_t X1, uint8_t Y0, uint8_t Y1,
                   uint16_t Color) {
   uint8_t y;
 
+  // ST7735S_SetAddrWindow(0, 0, 160 - 1, 128 - 1);
   for (; X0 <= X1; X0++) {
     ST7735S_SetPosition(X0, Y0);
     for (y = Y0; y <= Y1; y++) {
@@ -76,4 +77,14 @@ void UI_SetColors(uint8_t DarkMode) {
   gColorForeground = COLOR_FOREGROUND;
 
   DISPLAY_FillColor(COLOR_BACKGROUND);
+}
+
+void DrawVLine(uint8_t x, uint8_t y, uint8_t h, uint16_t color) {
+  // ST7735S_DrawFastLine(x, y, h, color, true);
+  DISPLAY_DrawRectangle0(x, y, 1, h, color);
+}
+
+void DrawHLine(uint8_t x, uint8_t y, uint8_t h, uint16_t color) {
+  // ST7735S_DrawFastLine(x, y, h, color, false);
+  DISPLAY_DrawRectangle0(x, y, h, 1, color);
 }
