@@ -17,8 +17,8 @@
 #ifndef APP_RADIO_H
 #define APP_RADIO_H
 
-#include "radio/channels.h"
-#include "radio/frequencies.h"
+#include "../radio/channels.h"
+#include "../radio/frequencies.h"
 
 extern uint8_t gCurrentVfo;
 extern ChannelInfo_t *gMainVfo;

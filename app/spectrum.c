@@ -14,26 +14,25 @@
  *     limitations under the License.
  */
 
-#include "app/spectrum.h"
-#include "app/radio.h"
-#include "driver/bk4819.h"
-#include "driver/delay.h"
-#include "driver/key.h"
-#include "driver/pins.h"
-#include "driver/speaker.h"
-#include "driver/st7735s.h"
-#include "helper/helper.h"
-#include "helper/inputbox.h"
-#include "misc.h"
-#include "radio/channels.h"
-#include "radio/settings.h"
-#include "ui/gfx.h"
-#include "ui/helper.h"
-#include "ui/main.h"
+#include "spectrum.h"
+#include "../driver/bk4819.h"
+#include "../driver/delay.h"
+#include "../driver/key.h"
+#include "../driver/pins.h"
+#include "../driver/speaker.h"
+#include "../driver/st7735s.h"
+#include "../helper/helper.h"
+#include "../misc.h"
+#include "../radio/channels.h"
+#include "../radio/settings.h"
+#include "../ui/gfx.h"
+#include "../ui/helper.h"
+#include "../ui/main.h"
+#include "radio.h"
 
 #ifdef UART_DEBUG
-#include "driver/uart.h"
-#include "external/printf/printf.h"
+#include "../driver/uart.h"
+#include "../external/printf/printf.h"
 #endif
 
 #define WATERFALL_RIGHT_MARGIN 0
@@ -244,7 +243,7 @@ void IncrementFreqStepIndex(void) {
 }
 
 void IncrementScanDelay(void) {
-  CurrentScanDelay = (CurrentScanDelay + 2) % 12;
+  CurrentScanDelay = (CurrentScanDelay + 1) % 12;
   DrawLabels();
 }
 
@@ -447,6 +446,46 @@ int ConvertDomain(int aValue, int aMin, int aMax, int bMin, int bMax) {
 }
 
 uint16_t MapColor(uint16_t Level) {
+  /* static const uint32_t pal[] = {
+      0x00000f, 0x000110, 0x000111, 0x000112, 0x000213, 0x000214, 0x000215,
+      0x000316, 0x000317, 0x000418, 0x000519, 0x00051a, 0x00061b, 0x00071c,
+      0x00071d, 0x00081e, 0x00091f, 0x000a20, 0x000a21, 0x000b22, 0x000c23,
+      0x000d24, 0x000e25, 0x000f26, 0x001027, 0x001128, 0x001229, 0x00142a,
+      0x00152b, 0x00162c, 0x00172d, 0x00192e, 0x001a2f, 0x001b30, 0x001d31,
+      0x001e32, 0x001f33, 0x002134, 0x002235, 0x002436, 0x002637, 0x002738,
+      0x002939, 0x002b3a, 0x002c3b, 0x002e3c, 0x00303d, 0x00323e, 0x00333f,
+      0x003540, 0x003741, 0x003942, 0x003b43, 0x003d44, 0x003f45, 0x004146,
+      0x004347, 0x004648, 0x004849, 0x004a4a, 0x004b4a, 0x004c49, 0x004d49,
+      0x004e49, 0x004f48, 0x005048, 0x005148, 0x005247, 0x005347, 0x005446,
+      0x005545, 0x005645, 0x005744, 0x005843, 0x005943, 0x005a42, 0x005b41,
+      0x005c40, 0x005d40, 0x005e3f, 0x005f3e, 0x00603d, 0x00613c, 0x00623b,
+      0x00633a, 0x006439, 0x006538, 0x006636, 0x006735, 0x006834, 0x006933,
+      0x006a31, 0x006b30, 0x006c2f, 0x006d2d, 0x006e2c, 0x006f2b, 0x007029,
+      0x007128, 0x007226, 0x007324, 0x007423, 0x007521, 0x00761f, 0x00771e,
+      0x00781c, 0x00791a, 0x007a18, 0x007b17, 0x007c15, 0x007d13, 0x007e11,
+      0x007f0f, 0x00800d, 0x00810b, 0x008209, 0x008307, 0x008404, 0x008502,
+      0x008600, 0x028700, 0x058800, 0x078900, 0x098a00, 0x0c8b00, 0x0e8c00,
+      0x108d00, 0x138e00, 0x158f00, 0x189000, 0x1b9100, 0x1d9200, 0x209300,
+      0x239400, 0x259500, 0x289600, 0x2b9700, 0x2e9800, 0x309900, 0x339a00,
+      0x369b00, 0x399c00, 0x3c9d00, 0x3f9e00, 0x429f00, 0x45a000, 0x48a100,
+      0x4ca200, 0x4fa300, 0x52a400, 0x55a500, 0x59a600, 0x5ca700, 0x5fa800,
+      0x63a900, 0x66aa00, 0x69ab00, 0x6dac00, 0x70ad00, 0x74ae00, 0x78af00,
+      0x7bb000, 0x7fb100, 0x83b200, 0x86b300, 0x8ab400, 0x8eb500, 0x92b600,
+      0x95b700, 0x99b800, 0x9db900, 0xa1ba00, 0xa5bb00, 0xa9bc00, 0xadbd00,
+      0xb1be00, 0xb5bf00, 0xbac000, 0xbec100, 0xc2c200, 0xc3c000, 0xc4bd00,
+      0xc5bb00, 0xc6b900, 0xc7b600, 0xc8b400, 0xc9b200, 0xcaaf00, 0xcbad00,
+      0xccaa00, 0xcda700, 0xcea500, 0xcfa200, 0xd09f00, 0xd19d00, 0xd29a00,
+      0xd39700, 0xd49400, 0xd59200, 0xd68f00, 0xd78c00, 0xd88900, 0xd98600,
+      0xda8300, 0xdb8000, 0xdc7d00, 0xdd7a00, 0xde7600, 0xdf7300, 0xe07000,
+      0xe16d00, 0xe26900, 0xe36600, 0xe46300, 0xe55f00, 0xe65c00, 0xe75900,
+      0xe85500, 0xe95200, 0xea4e00, 0xeb4a00, 0xec4700, 0xed4300, 0xee3f00,
+      0xef3c00, 0xf03800, 0xf13400, 0xf23000, 0xf32d00, 0xf42900, 0xf52500,
+      0xf62100, 0xf71d00, 0xf81900, 0xf91500, 0xfa1100, 0xfb0d00, 0xfc0800,
+      0xfd0400, 0xfe0000, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff,
+      0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff,
+      0xffffff, 0xffffff, 0xffffff, 0xffffff,
+  }; */
+
   static const uint32_t pal[] = {
       0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
       0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
@@ -485,13 +524,9 @@ uint16_t MapColor(uint16_t Level) {
       0xff1f00, 0xff1d00, 0xff1a00, 0xff1700, 0xff1500, 0xff1200, 0xff1000,
       0xff0d00, 0xff0b00, 0xff0800, 0xff0600, 0xff0300, 0xff0000, 0xff3333,
       0xff6666, 0xff9999, 0xffcccc, 0xffffff};
-  // 64      // min
-  // 340 // max
-  // Level -= 30;
-  // Level <<= 2;
 
   int16_t RXdBM = (Level >> 1) - 177;
-  Level = ConvertDomain(RXdBM, -140, -40, 28, 255);
+  Level = ConvertDomain(RXdBM, -160, -60, 35, ARRAY_SIZE(pal) - 1);
   uint32_t p = pal[Level];
   uint8_t r = (p >> 16) & 0xff;
   uint8_t g = (p >> 8) & 0xff;
@@ -506,13 +541,7 @@ uint16_t MapColor(uint16_t Level) {
 
 void DrawWaterfall() {
   static uint8_t scroll;
-  uint16_t High;
-
-  if ((RssiHigh - RssiLow) < 60) {
-    High = RssiLow + 60;
-  } else {
-    High = RssiHigh;
-  }
+  static uint8_t oldFreqIndex;
 
   scroll++;
   scroll %= (SCROLL_RIGHT_MARGIN - SCROLL_LEFT_MARGIN);
@@ -522,17 +551,18 @@ void DrawWaterfall() {
   ST7735S_SetAddrWindow((SCROLL_RIGHT_MARGIN)-scroll, 0,
                         (SCROLL_RIGHT_MARGIN)-scroll, 127);
 
-  for (uint8_t i = 0; i < 127; i++) {
-    uint16_t wf = GetAdjustedLevel(RssiValue[i], RssiLow, High, 100);
-    wf = MapColor(RssiValue[i]);
+  uint8_t barWidth = (1 << CurrentStepCountIndex);
 
-    // uint16_t wf = MapColor(RssiValue[i] - RssiLow);
-
-    ST7735S_SendU16(wf); // write to screen using waterfall color from palette
+  for (uint8_t i = 0; i < 127; i += barWidth) {
+    uint16_t c = MapColor(RssiValue[i]);
+    for (uint8_t j = 0; j < barWidth; j++) {
+      ST7735S_SendU16(c);
+    }
   }
 
-  DISPLAY_DrawRectangle1(52, 0, 128, 3, COLOR_BACKGROUND);
+  DISPLAY_DrawRectangle1(52, oldFreqIndex, 1, 3, COLOR_BACKGROUND);
   DISPLAY_DrawRectangle1(52, CurrentFreqIndex, 1, 3, COLOR_FOREGROUND);
+  oldFreqIndex = CurrentFreqIndex;
 }
 
 void StopSpectrum(void) {
