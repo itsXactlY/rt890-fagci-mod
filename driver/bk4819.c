@@ -445,14 +445,14 @@ void BK4819_SetFilterBandwidth(bool bIsNarrow) {
   if (gMainVfo->gModulationType == 0) { // if FM
 #ifndef ENABLE_REGISTER_EDIT
     if (bIsNarrow) {
-      // BK4819_WriteRegister(0x43, 0x4048); //stock
+      BK4819_WriteRegister(0x43, 0x4048); //stock
       // BK4819_WriteRegister(0x43, 0x7B08); //kamil/fagci
-      BK4819_WriteRegister(0x43, 0x1408);
+      // BK4819_WriteRegister(0x43, 0x1408);
       // BK4819_WriteRegister(0x43, 0x4408); //egzumer
     } else {
-      // BK4819_WriteRegister(0x43, 0x3028); //stock
+      BK4819_WriteRegister(0x43, 0x3028); //stock
       // BK4819_WriteRegister(0x43, 0x7B08); //kamil/fagci
-      BK4819_WriteRegister(0x43, 0x1408);
+      // BK4819_WriteRegister(0x43, 0x1408);
       // BK4819_WriteRegister(0x43, 0x45A8); //egzumer
     }
 #else
