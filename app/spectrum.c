@@ -14,15 +14,30 @@
 #include "../ui/spectrum.h"
 #include "radio.h"
 
+static const uint16_t U16_MAX = 65535;
+
 static bool running;
 static ChannelInfo_t *vfo;
 static FRange range;
 static uint32_t step;
 static Loot msm;
 
+static uint16_t rssiO = U16_MAX;
+static uint16_t noiseO = 0;
+
 static uint16_t tick = 0;
 static uint8_t delayMs = 3;
 static bool hard = true;
+static uint16_t noiseOpenDiff = 14;
+
+static void updateStats() {
+  const uint16_t noiseFloor = SP_GetNoiseFloor();
+  const uint16_t noiseMax = SP_GetNoiseMax();
+  rssiO = noiseFloor;
+  noiseO = noiseMax - noiseOpenDiff;
+}
+
+static bool isSquelchOpen() { return msm.rssi >= rssiO && msm.noise <= noiseO; }
 
 void Spectrum_Loop(void) {
   BK4819_SetFrequency(msm.f);
@@ -36,7 +51,13 @@ void Spectrum_Loop(void) {
   DELAY_WaitMS(delayMs);
   msm.rssi = BK4819_GetRSSI();
   msm.noise = BK4819_GetNoise();
-  msm.open = msm.noise < 50;
+  if (false) {
+    noiseO -= noiseOpenDiff;
+    msm.open = isSquelchOpen();
+    noiseO += noiseOpenDiff;
+  } else {
+    msm.open = isSquelchOpen();
+  }
   SP_AddPoint(&msm);
   msm.f += step;
   SP_Next();
@@ -45,6 +66,7 @@ void Spectrum_Loop(void) {
     tick = 0;
   }
   if (msm.f > range.end) {
+    updateStats();
     msm.f = range.start;
     SP_Render(&range, 0, 0, 128);
     SP_Begin();
@@ -131,8 +153,14 @@ void APP_Spectrum(void) {
   uint32_t f2 = gVfoState[1].RX.Frequency;
 
   step = FREQUENCY_GetStep(gSettings.FrequencyStep);
-  range.start = f1 < f2 ? f1 : f2;
-  range.end = f1 > f2 ? f1 : f2;
+
+  if (f1 < f2) {
+    range.start = f1;
+    range.end = f2;
+  } else {
+    range.start = f2;
+    range.end = f1;
+  }
 
   DISPLAY_Fill(0, 159, 0, 127, COLOR_BACKGROUND);
 
@@ -145,6 +173,7 @@ void APP_Spectrum(void) {
   while (running) {
     Spectrum_Loop();
     while (CheckKeys()) {
+      SP_ResetRender();
       SP_Render(&range, 0, 0, 128);
       DELAY_WaitMS(10);
     }

@@ -12,6 +12,7 @@ typedef struct {
 
 void SP_AddPoint(Loot *msm);
 void SP_ResetHistory();
+void SP_ResetRender();
 void SP_Init(uint16_t steps, uint8_t width);
 void SP_Begin();
 void SP_Next();
@@ -23,5 +24,7 @@ void SP_RenderArrow(FRange *p, uint32_t f, uint8_t sx, uint8_t sy, uint8_t sh);
 DBmRange SP_GetGradientRange();
 bool SP_UpdateGradientMin(bool inc);
 bool SP_UpdateGradientMax(bool inc);
+uint16_t SP_GetNoiseFloor();
+uint16_t SP_GetNoiseMax();
 
 #endif /* end of include guard: SPECTRUM_DRAW_H */

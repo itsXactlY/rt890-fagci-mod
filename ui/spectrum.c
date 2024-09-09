@@ -6,7 +6,9 @@
 #define MAX_POINTS 160
 
 static uint16_t rssiHistory[MAX_POINTS] = {0};
+static uint16_t noiseHistory[MAX_POINTS] = {0};
 static bool markers[MAX_POINTS] = {0};
+static bool updated[MAX_POINTS] = {0};
 static uint8_t x;
 static uint8_t historySize;
 static uint8_t filledPoints;
@@ -16,6 +18,8 @@ static uint16_t currentStep;
 static uint8_t exLen;
 
 static DBmRange dBmRange = {-150, -60};
+
+static bool ticksRendered = false;
 
 static const uint32_t GRADIENT_PALETTE[] = {
     0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
@@ -88,10 +92,18 @@ static uint32_t ConvertDomainF(uint32_t aValue, uint32_t aMin, uint32_t aMax,
 void SP_ResetHistory(void) {
   for (uint8_t i = 0; i < MAX_POINTS; ++i) {
     rssiHistory[i] = 0;
+    noiseHistory[i] = UINT16_MAX;
     markers[i] = false;
   }
   filledPoints = 0;
   currentStep = 0;
+}
+
+void SP_ResetRender() {
+  ticksRendered = false;
+  for (uint8_t i = 0; i < MAX_POINTS; ++i) {
+    updated[i] = true;
+  }
 }
 
 void SP_Begin(void) { currentStep = 0; }
@@ -108,6 +120,7 @@ void SP_Init(uint16_t steps, uint8_t width) {
   exLen = ceilDiv(historySize, stepsCount);
   SP_ResetHistory();
   SP_Begin();
+  ticksRendered = false;
 }
 
 void SP_AddPoint(Loot *msm) {
@@ -116,10 +129,16 @@ void SP_AddPoint(Loot *msm) {
     x = historySize * currentStep / stepsCount + exIndex;
     if (ox != x) {
       rssiHistory[x] = markers[x] = 0;
+      updated[x] = false;
       ox = x;
     }
     if (msm->rssi > rssiHistory[x]) {
       rssiHistory[x] = msm->rssi;
+      updated[x] = true;
+    }
+    if (msm->noise < noiseHistory[x]) {
+      noiseHistory[x] = msm->noise;
+      updated[x] = true;
     }
     if (markers[x] == false && msm->open) {
       markers[x] = msm->open;
@@ -134,6 +153,8 @@ void SP_ResetPoint(void) {
   for (uint8_t exIndex = 0; exIndex < exLen; ++exIndex) {
     uint8_t lx = historySize * currentStep / stepsCount + exIndex;
     rssiHistory[lx] = 0;
+    noiseHistory[lx] = UINT16_MAX;
+    updated[lx] = false;
     markers[lx] = false;
   }
 }
@@ -147,8 +168,6 @@ static void drawTicks(uint8_t x1, uint8_t x2, uint8_t y, uint32_t fs,
 }
 
 static void SP_DrawTicks(uint8_t x1, uint8_t x2, uint8_t y, FRange *range) {
-  // TODO: automatic ticks size determination
-
   uint32_t fs = range->start;
   uint32_t fe = range->end;
   uint32_t bw = fe - fs;
@@ -169,7 +188,7 @@ static void SP_DrawTicks(uint8_t x1, uint8_t x2, uint8_t y, FRange *range) {
 }
 
 static void ShiftShortStringRight(uint8_t Start, uint8_t End) {
-  for (uint8_t i = End; i > Start; i--) {
+  for (int8_t i = End; i > Start; i--) {
     gShortString[i + 1] = gShortString[i];
   }
 }
@@ -181,10 +200,11 @@ void SP_Render(FRange *p, uint8_t sx, uint8_t sy, uint8_t sh) {
   const uint16_t vMin = rssiMin - 2;
   const uint16_t vMax = rssiMax + 20 + (rssiMax - rssiMin) / 2;
   sh = 128 - S_BOTTOM;
-  DISPLAY_DrawRectangle1(0, S_BOTTOM, 4, 160, COLOR_BACKGROUND);
 
-  if (p) {
+  if (!ticksRendered) {
+    DISPLAY_DrawRectangle1(0, S_BOTTOM, 4, 160, COLOR_BACKGROUND);
     SP_DrawTicks(sx, sx + historySize - 1, S_BOTTOM, p);
+    ticksRendered = true;
   }
 
   DISPLAY_DrawRectangle0(sx, S_BOTTOM + 3, historySize, 1, COLOR_GREY);
@@ -200,11 +220,18 @@ void SP_Render(FRange *p, uint8_t sx, uint8_t sy, uint8_t sh) {
   UI_DrawSmallString(112, 2, gShortString, 8);
 
   for (uint8_t i = 0; i < filledPoints; ++i) {
-    uint8_t yVal = ConvertDomain(rssiHistory[i], vMin, vMax, S_BOTTOM + 4, sh);
-    DISPLAY_DrawRectangle1(i, yVal, sh - yVal, 1, COLOR_BACKGROUND);
-    DISPLAY_DrawRectangle1(i, S_BOTTOM + 4, yVal, 1, MapColor(rssiHistory[i]));
-    if (markers[i]) {
-      DISPLAY_DrawRectangle1(i, S_BOTTOM, 2, 1, COLOR_GREEN);
+    if (updated[i]) {
+      updated[i] = false;
+
+      uint8_t yVal =
+          ConvertDomain(rssiHistory[i], vMin, vMax, S_BOTTOM + 4, sh);
+      DISPLAY_DrawRectangle1(i, yVal + S_BOTTOM + 4, sh - yVal, 1,
+                             COLOR_BACKGROUND);
+      DISPLAY_DrawRectangle1(i, S_BOTTOM + 4, yVal, 1,
+                             MapColor(rssiHistory[i]));
+      if (markers[i]) {
+        DISPLAY_DrawRectangle1(i, S_BOTTOM, 2, 1, COLOR_GREEN);
+      }
     }
   }
 }
@@ -260,3 +287,6 @@ bool SP_UpdateGradientMax(bool inc) {
   }
   return false;
 }
+
+uint16_t SP_GetNoiseFloor() { return Std(rssiHistory, filledPoints); }
+uint16_t SP_GetNoiseMax() { return Max(noiseHistory, filledPoints); }
