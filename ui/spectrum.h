@@ -13,7 +13,7 @@ typedef struct {
 void SP_AddPoint(Loot *msm);
 void SP_ResetHistory();
 void SP_ResetRender();
-void SP_Init(uint16_t steps, uint8_t width);
+void SP_Init(uint32_t steps, uint8_t width);
 void SP_Begin();
 void SP_Next();
 void SP_Render(FRange *p, uint8_t x, uint8_t y, uint8_t h);

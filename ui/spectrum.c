@@ -13,8 +13,8 @@ static uint8_t x;
 static uint8_t historySize;
 static uint8_t filledPoints;
 
-static uint16_t stepsCount;
-static uint16_t currentStep;
+static uint32_t stepsCount;
+static uint32_t currentStep;
 static uint8_t exLen;
 
 static DBmRange dBmRange = {-150, -60};
@@ -75,7 +75,7 @@ static uint16_t MapColor(uint16_t rssi) {
   return COLOR_RGB(r, g, b);
 }
 
-static uint16_t ceilDiv(uint16_t a, uint16_t b) { return (a + b - 1) / b; }
+static uint32_t ceilDiv(uint32_t a, uint32_t b) { return (a + b - 1) / b; }
 
 static uint32_t ClampF(uint32_t v, uint32_t min, uint32_t max) {
   return v <= min ? min : (v >= max ? max : v);
@@ -94,6 +94,7 @@ void SP_ResetHistory(void) {
     rssiHistory[i] = 0;
     noiseHistory[i] = UINT16_MAX;
     markers[i] = false;
+    updated[i] = false;
   }
   filledPoints = 0;
   currentStep = 0;
@@ -102,7 +103,7 @@ void SP_ResetHistory(void) {
 void SP_ResetRender() {
   ticksRendered = false;
   for (uint8_t i = 0; i < MAX_POINTS; ++i) {
-    updated[i] = true;
+    updated[i] = false;
   }
 }
 
@@ -114,7 +115,7 @@ void SP_Next(void) {
   }
 }
 
-void SP_Init(uint16_t steps, uint8_t width) {
+void SP_Init(uint32_t steps, uint8_t width) {
   stepsCount = steps;
   historySize = width;
   exLen = ceilDiv(historySize, stepsCount);
@@ -162,7 +163,7 @@ void SP_ResetPoint(void) {
 static void drawTicks(uint8_t x1, uint8_t x2, uint8_t y, uint32_t fs,
                       uint32_t fe, uint32_t div, uint8_t h) {
   for (uint32_t f = fs - (fs % div) + div; f < fe; f += div) {
-    uint8_t x = ConvertDomain(f, fs, fe, x1, x2);
+    uint8_t x = ConvertDomainF(f, fs, fe, x1, x2);
     DISPLAY_DrawRectangle1(x, y - h + 3, h, 1, COLOR_GREY);
   }
 }
@@ -237,7 +238,7 @@ void SP_Render(FRange *p, uint8_t sx, uint8_t sy, uint8_t sh) {
 }
 
 void SP_RenderArrow(FRange *p, uint32_t f, uint8_t sx, uint8_t sy, uint8_t sh) {
-  uint8_t cx = ConvertDomain(f, p->start, p->end, sx, sx + historySize - 1);
+  uint8_t cx = ConvertDomainF(f, p->start, p->end, sx, sx + historySize - 1);
   DrawVLine(cx, sy, 4, COLOR_GREY);
   DISPLAY_DrawRectangle0(cx - 2, sy, 5, 2, COLOR_GREY);
 }
