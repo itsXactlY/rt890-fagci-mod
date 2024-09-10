@@ -134,3 +134,9 @@ uint16_t Std(uint16_t *data, uint8_t n) {
 }
 
 int16_t Rssi2DBm(uint16_t rssi) { return (rssi >> 1) - 177; }
+
+void ShiftShortStringRight(uint8_t Start, uint8_t End) {
+  for (int8_t i = End; i > Start; i--) {
+    gShortString[i + 1] = gShortString[i];
+  }
+}

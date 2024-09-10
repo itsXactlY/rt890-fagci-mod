@@ -1,4 +1,5 @@
 #include "spectrum.h"
+#include "../driver/st7735s.h"
 #include "../helper/helper.h"
 #include "../ui/gfx.h"
 #include "../ui/helper.h"
@@ -146,7 +147,7 @@ void SP_AddPoint(Loot *msm) {
     }
   }
   if (x > filledPoints && x < historySize) {
-    filledPoints = x;
+    filledPoints = x + 1;
   }
 }
 
@@ -188,50 +189,44 @@ static void SP_DrawTicks(uint8_t x1, uint8_t x2, uint8_t y, FRange *range) {
   }
 }
 
-static void ShiftShortStringRight(uint8_t Start, uint8_t End) {
-  for (int8_t i = End; i > Start; i--) {
-    gShortString[i + 1] = gShortString[i];
-  }
-}
-
 void SP_Render(FRange *p, uint8_t sx, uint8_t sy, uint8_t sh) {
-  const uint8_t S_BOTTOM = 13;
   const uint16_t rssiMin = Min(rssiHistory, filledPoints);
   const uint16_t rssiMax = Max(rssiHistory, filledPoints);
   const uint16_t vMin = rssiMin - 2;
   const uint16_t vMax = rssiMax + 20 + (rssiMax - rssiMin) / 2;
-  sh = 128 - S_BOTTOM;
+
+  const uint8_t S_BOTTOM = 13;
+  const uint8_t G_BOTTOM = S_BOTTOM + 4;
+  sh = 128 - G_BOTTOM;
 
   if (!ticksRendered) {
     DISPLAY_DrawRectangle1(0, S_BOTTOM, 4, 160, COLOR_BACKGROUND);
+    DISPLAY_DrawRectangle0(sx, S_BOTTOM + 3, historySize, 1, COLOR_GREY);
     SP_DrawTicks(sx, sx + historySize - 1, S_BOTTOM, p);
     ticksRendered = true;
+    Int2Ascii(p->start / 10, 7);
+    ShiftShortStringRight(2, 7);
+    gShortString[3] = '.';
+    UI_DrawSmallString(2, 2, gShortString, 8);
+
+    Int2Ascii(p->end / 10, 7);
+    ShiftShortStringRight(2, 7);
+    gShortString[3] = '.';
+    UI_DrawSmallString(112, 2, gShortString, 8);
   }
-
-  DISPLAY_DrawRectangle0(sx, S_BOTTOM + 3, historySize, 1, COLOR_GREY);
-
-  Int2Ascii(p->start / 10, 7);
-  ShiftShortStringRight(2, 7);
-  gShortString[3] = '.';
-  UI_DrawSmallString(2, 2, gShortString, 8);
-
-  Int2Ascii(p->end / 10, 7);
-  ShiftShortStringRight(2, 7);
-  gShortString[3] = '.';
-  UI_DrawSmallString(112, 2, gShortString, 8);
 
   for (uint8_t i = 0; i < filledPoints; ++i) {
     if (updated[i]) {
       updated[i] = false;
 
-      uint8_t yVal =
-          ConvertDomain(rssiHistory[i], vMin, vMax, S_BOTTOM + 4, sh);
-      DISPLAY_DrawRectangle1(i, yVal + S_BOTTOM + 4, sh - yVal, 1,
+      uint8_t yVal = ConvertDomain(rssiHistory[i], vMin, vMax, 0, sh);
+      DISPLAY_DrawRectangle1(i, yVal + G_BOTTOM, sh - yVal, 1,
                              COLOR_BACKGROUND);
-      DISPLAY_DrawRectangle1(i, S_BOTTOM + 4, yVal, 1,
-                             MapColor(rssiHistory[i]));
+      DISPLAY_DrawRectangle1(i, G_BOTTOM, yVal, 1, MapColor(rssiHistory[i]));
       if (markers[i]) {
         DISPLAY_DrawRectangle1(i, S_BOTTOM, 2, 1, COLOR_GREEN);
+      } else {
+        DISPLAY_DrawRectangle1(i, S_BOTTOM, 2, 1, COLOR_BACKGROUND);
       }
     }
   }

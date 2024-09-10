@@ -70,10 +70,10 @@ static void I2C_Send(uint8_t Data) {
     } else {
       gpio_bits_reset(GPIOB, BOARD_GPIOB_BK4819_SDA);
     }
-    Delay(10);
+    Delay(3);
     gpio_bits_set(GPIOB, BOARD_GPIOB_BK4819_SCL);
     Data <<= 1;
-    Delay(10);
+    Delay(3);
   }
 }
 
@@ -90,9 +90,9 @@ static uint16_t I2C_RecvU16(void) {
     if (gpio_input_data_bit_read(GPIOB, BOARD_GPIOB_BK4819_SDA)) {
       Data |= 1;
     }
-    Delay(10);
+    Delay(3);
     gpio_bits_reset(GPIOB, BOARD_GPIOB_BK4819_SCL);
-    Delay(10);
+    Delay(3);
   }
 
   return Data;
@@ -146,7 +146,7 @@ uint16_t BK4819_ReadRegister(uint8_t Reg) {
   gpio_bits_reset(GPIOB, BOARD_GPIOB_BK4819_CS);
 
   I2C_Send(0x80U | Reg);
-  Delay(10);
+  Delay(3);
   Data = I2C_RecvU16();
 
   gpio_bits_set(GPIOB, BOARD_GPIOB_BK4819_CS);
@@ -539,11 +539,18 @@ void BK4819_RestoreGainSettings() {
   */
 
   // Default values
-  BK4819_WriteRegister(0x10, 0x0038);
+  /* BK4819_WriteRegister(0x10, 0x0038);
   BK4819_WriteRegister(0x11, 0x025a);
   BK4819_WriteRegister(0x12, 0x037b);
   BK4819_WriteRegister(0x13, 0x03de);
-  BK4819_WriteRegister(0x14, 0x0000);
+  BK4819_WriteRegister(0x14, 0x0000); */
+    BK4819_WriteRegister(0x13, 0x03BE);
+    BK4819_WriteRegister(0x12, 0x037B);
+    BK4819_WriteRegister(0x11, 0x027B);
+    BK4819_WriteRegister(0x10, 0x007A);
+    BK4819_WriteRegister(0x14, 0x0019);
+    BK4819_WriteRegister(0x49, 0x2A38);
+    BK4819_WriteRegister(0x7B, 0x8420);
 }
 
 void BK4819_ToggleAGCMode() {
@@ -613,7 +620,7 @@ void BK4819_StartAudio(void) {
   } else {
     // FM
     BK4819_EnableScramble(gMainVfo->Scramble);
-    BK4819_EnableCompander(true);
+    // BK4819_EnableCompander(true);
     // BK4819_WriteRegister(0x43, 0x3028); // restore filter just in case -
     // this gets overwritten by sane defaults anyway.
     // Unset bit 4 of register 73 (Auto Frequency Control Disable)

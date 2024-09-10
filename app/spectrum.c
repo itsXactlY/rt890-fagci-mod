@@ -30,6 +30,9 @@ static uint8_t delayMs = 3;
 static bool hard = true;
 static uint16_t noiseOpenDiff = 14;
 
+static Loot catch = {0};
+static bool isListening = false;
+
 static void updateStats() {
   const uint16_t noiseFloor = SP_GetNoiseFloor();
   const uint16_t noiseMax = SP_GetNoiseMax();
@@ -40,18 +43,20 @@ static void updateStats() {
 static bool isSquelchOpen() { return msm.rssi >= rssiO && msm.noise <= noiseO; }
 
 void Spectrum_Loop(void) {
-  BK4819_SetFrequency(msm.f);
-  const uint16_t reg = BK4819_ReadRegister(0x30);
-  if (hard) {
-    BK4819_WriteRegister(0x30, 0x0200);
-  } else {
-    BK4819_WriteRegister(0x30, reg & ~BK4819_REG_30_ENABLE_VCO_CALIB);
+  if (!isListening) {
+    BK4819_WriteRegister(0x38, (msm.f >> 0) & 0xFFFF);
+    BK4819_WriteRegister(0x39, (msm.f >> 16) & 0xFFFF);
+    if (hard) {
+      BK4819_WriteRegister(0x30, 0x0200);
+    } else {
+      BK4819_WriteRegister(0x30, 0xBFF1 & ~BK4819_REG_30_ENABLE_VCO_CALIB);
+    }
+    BK4819_WriteRegister(0x30, 0xBFF1);
+    DELAY_WaitMS(delayMs);
   }
-  BK4819_WriteRegister(0x30, reg);
-  DELAY_WaitMS(delayMs);
   msm.rssi = BK4819_GetRSSI();
   msm.noise = BK4819_GetNoise();
-  if (false) {
+  if (isListening) {
     noiseO -= noiseOpenDiff;
     msm.open = isSquelchOpen();
     noiseO += noiseOpenDiff;
@@ -59,19 +64,47 @@ void Spectrum_Loop(void) {
     msm.open = isSquelchOpen();
   }
   SP_AddPoint(&msm);
-  msm.f += step;
-  SP_Next();
-  if (tick >= 100) {
+
+  if (isListening != msm.open) {
+    isListening = msm.open;
+    if (isListening) {
+      catch = msm;
+
+      Int2Ascii(catch.f, 8);
+      ShiftShortStringRight(2, 7);
+      gShortString[3] = '.';
+      gColorForeground = COLOR_GREEN;
+      UI_DrawSmallString(58, 2, gShortString, 8);
+      gColorForeground = COLOR_FOREGROUND;
+
+      BK4819_StartAudio();
+    } else {
+      RADIO_EndAudio();
+    }
     SP_Render(&range, 0, 0, 128);
     tick = 0;
   }
+  if (isListening) {
+    return;
+  }
+
+  msm.f += step;
+  SP_Next();
+
   if (msm.f > range.end) {
     updateStats();
     msm.f = range.start;
     SP_Render(&range, 0, 0, 128);
+    tick = 0;
     SP_Begin();
+    return;
   }
+
   tick++;
+  if (tick >= 100) {
+    SP_Render(&range, 0, 0, 128);
+    tick = 0;
+  }
 }
 
 bool CheckKeys(void) {
@@ -163,6 +196,8 @@ void APP_Spectrum(void) {
   }
 
   DISPLAY_Fill(0, 159, 0, 127, COLOR_BACKGROUND);
+
+  catch.f = 0;
 
   msm.f = range.start;
   SP_Init((range.end - range.start) / step, 160);

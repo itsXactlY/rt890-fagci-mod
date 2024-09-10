@@ -37,5 +37,6 @@ uint16_t Std(uint16_t *data, uint8_t n);
 
 int16_t Rssi2DBm(uint16_t rssi);
 
-#endif
+void ShiftShortStringRight(uint8_t Start, uint8_t End);
 
+#endif
