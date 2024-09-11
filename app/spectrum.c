@@ -42,18 +42,19 @@ static void updateStats() {
 
 static bool isSquelchOpen() { return msm.rssi >= rssiO && msm.noise <= noiseO; }
 
-void Spectrum_Loop(void) {
-  if (!isListening) {
-    BK4819_WriteRegister(0x38, (msm.f >> 0) & 0xFFFF);
-    BK4819_WriteRegister(0x39, (msm.f >> 16) & 0xFFFF);
-    if (hard) {
-      BK4819_WriteRegister(0x30, 0x0200);
-    } else {
-      BK4819_WriteRegister(0x30, 0xBFF1 & ~BK4819_REG_30_ENABLE_VCO_CALIB);
-    }
-    BK4819_WriteRegister(0x30, 0xBFF1);
-    DELAY_WaitMS(delayMs);
+static inline void tuneTo(uint32_t f) {
+  BK4819_WriteRegister(0x38, (msm.f >> 0) & 0xFFFF);
+  BK4819_WriteRegister(0x39, (msm.f >> 16) & 0xFFFF);
+  if (hard) {
+    BK4819_WriteRegister(0x30, 0x0200);
+  } else {
+    BK4819_WriteRegister(0x30, 0xBFF1 & ~BK4819_REG_30_ENABLE_VCO_CALIB);
   }
+  BK4819_WriteRegister(0x30, 0xBFF1);
+  DELAY_WaitMS(delayMs);
+}
+
+static inline void measure() {
   msm.rssi = BK4819_GetRSSI();
   msm.noise = BK4819_GetNoise();
   if (isListening) {
@@ -63,8 +64,9 @@ void Spectrum_Loop(void) {
   } else {
     msm.open = isSquelchOpen();
   }
-  SP_AddPoint(&msm);
+}
 
+static inline void toggleListening() {
   if (isListening != msm.open) {
     isListening = msm.open;
     if (isListening) {
@@ -84,6 +86,17 @@ void Spectrum_Loop(void) {
     SP_Render(&range, 0, 0, 128);
     tick = 0;
   }
+}
+
+void Spectrum_Loop(void) {
+  if (!isListening) {
+    tuneTo(msm.f);
+  }
+
+  measure();
+  SP_AddPoint(&msm);
+  toggleListening();
+
   if (isListening) {
     return;
   }
