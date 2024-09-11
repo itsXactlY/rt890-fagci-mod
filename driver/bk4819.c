@@ -196,7 +196,7 @@ void BK4819_Init(void) {
   BK4819_WriteRegister(0x53, 0xE678);
   BK4819_WriteRegister(0x2C, 0x5705);
   BK4819_WriteRegister(0x4B, 0x7102);
-  // BK4819_WriteRegister(0x77, 0x88EF);
+  BK4819_WriteRegister(0x77, 0x88EF);
   BK4819_WriteRegister(0x26, 0x13A0);
   BK4819_SetAFResponseCoefficients(false, true,
                                    gCalibration.RX_3000Hz_Coefficient);
