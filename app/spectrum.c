@@ -8,6 +8,7 @@
 #include "../helper/helper.h"
 #include "../misc.h"
 #include "../radio/channels.h"
+#include "../radio/scheduler.h"
 #include "../radio/settings.h"
 #include "../ui/gfx.h"
 #include "../ui/helper.h"
@@ -26,13 +27,16 @@ static Loot msm;
 static uint16_t rssiO = U16_MAX;
 static uint16_t noiseO = 0;
 
-static uint16_t tick = 0;
+static uint32_t lastRender = 0;
 static uint8_t delayMs = 3;
 static bool hard = true;
 static uint16_t noiseOpenDiff = 14;
 
 static Loot catch = {0};
 static bool isListening = false;
+
+static uint32_t lastBatRender;
+static uint32_t lastKeyTime = 0;
 
 static void updateStats() {
   const uint16_t noiseFloor = SP_GetNoiseFloor();
@@ -43,9 +47,23 @@ static void updateStats() {
 
 static bool isSquelchOpen() { return msm.rssi >= rssiO && msm.noise <= noiseO; }
 
+static int8_t band = 0;
+
 static inline void tuneTo(uint32_t f) {
-  BK4819_WriteRegister(0x38, (msm.f >> 0) & 0xFFFF);
-  BK4819_WriteRegister(0x39, (msm.f >> 16) & 0xFFFF);
+  int8_t b = 0;
+  if (!gSettings.bUseVHF || f <= 24000000) {
+    if (!gSettings.bUseVHF && f < 24000000) {
+      b = 1;
+    }
+  } else {
+    b = -1;
+  }
+  if (b != band) {
+    band = b;
+    FREQUENCY_SelectBand(b > 0 ? f * 2 : f / 2);
+  }
+  BK4819_WriteRegister(0x38, (f >> 0) & 0xFFFF);
+  BK4819_WriteRegister(0x39, (f >> 16) & 0xFFFF);
   if (hard) {
     BK4819_WriteRegister(0x30, 0x0200);
   } else {
@@ -69,16 +87,21 @@ static inline void measure() {
 
 static void render() {
   SP_Render(&range, 0, 0, 96);
-  tick = 0;
-  Int2Ascii(delayMs, 2);
-  UI_DrawSmallString(2, 96 - 13 + 4, gShortString, 2);
 
-  Int2Ascii(noiseOpenDiff, 2);
-  UI_DrawSmallString(160 - 46, 96 - 13 + 4, gShortString, 2);
+  if (gTimeSinceBoot - lastKeyTime < 3000) {
+    Int2Ascii(delayMs, 2);
+    UI_DrawSmallString(2, 96 - 13 + 4, gShortString, 2);
 
-  gBatteryVoltage = BATTERY_GetVoltage();
-  UI_DrawStatusIcon(139, ICON_BATTERY, true, COLOR_FOREGROUND);
-  UI_DrawBattery(false);
+    Int2Ascii(noiseOpenDiff, 2);
+    UI_DrawSmallString(160 - 11, 96 - 13 + 4, gShortString, 2);
+  }
+
+  if (gTimeSinceBoot - lastBatRender > 2000) {
+    lastBatRender = gTimeSinceBoot;
+    gBatteryVoltage = BATTERY_GetVoltage();
+    UI_DrawBatteryBar();
+  }
+  lastRender = gTimeSinceBoot;
 }
 
 static inline void toggleListening() {
@@ -126,10 +149,9 @@ void Spectrum_Loop(void) {
     return;
   }
 
-  tick++;
-  if (tick >= 100) {
+  /* if (gTimeSinceBoot - lastRender >= 500) {
     render();
-  }
+  } */
 }
 
 bool CheckKeys(void) {
@@ -234,7 +256,8 @@ void APP_Spectrum(void) {
   while (running) {
     Spectrum_Loop();
     while (CheckKeys()) {
-      SP_ResetRender();
+      lastKeyTime = gTimeSinceBoot;
+      // SP_ResetRender();
       render();
       DELAY_WaitMS(100);
     }
