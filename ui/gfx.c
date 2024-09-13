@@ -28,27 +28,23 @@ uint16_t COLOR_GREEN;
 uint16_t COLOR_BLUE;
 uint16_t COLOR_GREY;
 
-void DISPLAY_FillColor(uint16_t Color) {
-  uint16_t i;
-
-  ST7735S_SetPosition(0, 0);
-  for (i = 0; i < (160 * 128); i++) {
+void DISPLAY_FillNoReset(uint8_t X0, uint8_t X1, uint8_t Y0, uint8_t Y1,
+                         uint16_t Color) {
+  ST7735S_SetAddrWindow(X0, Y0, X1, Y1);
+  for (uint32_t i = 0; i < (X1 - X0 + 1) * (Y1 - Y0 + 1); ++i) {
     ST7735S_SendU16(Color);
   }
 }
 
+void DISPLAY_ResetWindow() { ST7735S_SetAddrWindow(0, 0, 159, 127); }
+
 void DISPLAY_Fill(uint8_t X0, uint8_t X1, uint8_t Y0, uint8_t Y1,
                   uint16_t Color) {
-  uint8_t y;
-
-  // ST7735S_SetAddrWindow(0, 0, 160 - 1, 128 - 1);
-  for (; X0 <= X1; X0++) {
-    ST7735S_SetPosition(X0, Y0);
-    for (y = Y0; y <= Y1; y++) {
-      ST7735S_SendU16(Color);
-    }
-  }
+  DISPLAY_FillNoReset(X0, X1, Y0, Y1, Color);
+  DISPLAY_ResetWindow();
 }
+
+void DISPLAY_FillColor(uint16_t Color) { DISPLAY_Fill(0, 159, 0, 127, Color); }
 
 void DISPLAY_DrawRectangle0(uint8_t X, uint8_t Y, uint8_t W, uint8_t H,
                             uint16_t Color) {
@@ -58,6 +54,16 @@ void DISPLAY_DrawRectangle0(uint8_t X, uint8_t Y, uint8_t W, uint8_t H,
 void DISPLAY_DrawRectangle1(uint8_t X, uint8_t Y, uint8_t H, uint8_t W,
                             uint16_t Color) {
   DISPLAY_Fill(X, X + W - 1, Y, Y + H - 1, Color);
+}
+
+void DISPLAY_DrawRectangle0Nr(uint8_t X, uint8_t Y, uint8_t W, uint8_t H,
+                              uint16_t Color) {
+  DISPLAY_FillNoReset(X, X + W - 1, Y, Y + H - 1, Color);
+}
+
+void DISPLAY_DrawRectangle1Nr(uint8_t X, uint8_t Y, uint8_t H, uint8_t W,
+                              uint16_t Color) {
+  DISPLAY_FillNoReset(X, X + W - 1, Y, Y + H - 1, Color);
 }
 
 void UI_SetColors(uint8_t DarkMode) {

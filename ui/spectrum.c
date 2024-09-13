@@ -17,7 +17,7 @@ static uint32_t stepsCount;
 static uint32_t currentStep;
 static uint8_t exLen;
 
-static DBmRange dBmRange = {-150, -60};
+static DBmRange dBmRange = {-150, -120};
 
 static bool ticksRendered = false;
 
@@ -53,7 +53,7 @@ static const int16_t GRADIENT_PALETTE[] = {
     0x631f, 0x9c9f, 0xce1f, 0xffbf};
 
 static uint16_t MapColor(uint16_t rssi) {
-  rssi = ConvertDomain(Rssi2DBm(rssi), dBmRange.min, dBmRange.max, 35,
+  rssi = ConvertDomain(Rssi2DBm(rssi), dBmRange.min, dBmRange.max, 27,
                        ARRAY_SIZE(GRADIENT_PALETTE) - 1);
   return GRADIENT_PALETTE[rssi];
 }
@@ -177,13 +177,17 @@ void SP_Render(FRange *p, uint8_t sx, uint8_t sy, uint8_t sh) {
   const uint16_t vMin = rssiMin - 2;
   const uint16_t vMax = rssiMax + 20 + (rssiMax - rssiMin) / 2;
 
+  dBmRange.min = Rssi2DBm(vMin);
+  dBmRange.max = Rssi2DBm(vMax);
+
   const uint8_t S_BOTTOM = 13;
   const uint8_t G_BOTTOM = S_BOTTOM + 4;
-  sh = 128 - G_BOTTOM;
+  sh = 96 - G_BOTTOM - 13;
 
   if (!ticksRendered) {
     DISPLAY_DrawRectangle1(0, S_BOTTOM, 4, 160, COLOR_BACKGROUND);
-    DISPLAY_DrawRectangle0(sx, S_BOTTOM + 3, historySize, 1, COLOR_GREY);
+    DISPLAY_DrawRectangle0(sx, G_BOTTOM - 1, historySize, 1, COLOR_GREY);
+    DISPLAY_DrawRectangle0(sx, G_BOTTOM + sh, historySize, 1, COLOR_GREY);
     SP_DrawTicks(sx, sx + historySize - 1, S_BOTTOM, p);
     ticksRendered = true;
     Int2Ascii(p->start / 10, 7);
@@ -197,21 +201,24 @@ void SP_Render(FRange *p, uint8_t sx, uint8_t sy, uint8_t sh) {
     UI_DrawSmallString(112, 2, gShortString, 8);
   }
 
-  for (uint8_t i = 0; i < filledPoints; ++i) {
+  for (uint8_t i = 0; i < filledPoints; i += exLen) {
     if (needRedraw[i]) {
       needRedraw[i] = false;
 
-      uint8_t yVal = ConvertDomain(rssiHistory[i], vMin, vMax, 0, sh);
-      DISPLAY_DrawRectangle1(i, yVal + G_BOTTOM, sh - yVal, 1,
-                             COLOR_BACKGROUND);
-      DISPLAY_DrawRectangle1(i, G_BOTTOM, yVal, 1, MapColor(rssiHistory[i]));
+      uint8_t yVal =
+          ConvertDomain(rssiHistory[i] * 2, vMin * 2, vMax * 2, 0, sh);
+      DISPLAY_DrawRectangle1Nr(i, G_BOTTOM, yVal, exLen,
+                               MapColor(rssiHistory[i]));
+      DISPLAY_DrawRectangle1Nr(i, yVal + G_BOTTOM, sh - yVal, exLen,
+                               COLOR_BACKGROUND);
       if (markers[i]) {
-        DISPLAY_DrawRectangle1(i, S_BOTTOM, 2, 1, COLOR_GREEN);
+        DISPLAY_DrawRectangle1Nr(i, S_BOTTOM, 2, exLen, COLOR_GREEN);
       } else {
-        DISPLAY_DrawRectangle1(i, S_BOTTOM, 2, 1, COLOR_BACKGROUND);
+        DISPLAY_DrawRectangle1Nr(i, S_BOTTOM, 2, exLen, COLOR_BACKGROUND);
       }
     }
   }
+  DISPLAY_ResetWindow();
 }
 
 void SP_RenderArrow(FRange *p, uint32_t f, uint8_t sx, uint8_t sy, uint8_t sh) {
@@ -235,36 +242,6 @@ void SP_RenderRssi(uint16_t rssi, char *text, bool top, uint8_t sx, uint8_t sy,
 }
 
 DBmRange SP_GetGradientRange() { return dBmRange; }
-
-bool SP_UpdateGradientMin(bool inc) {
-  if (inc) {
-    if (dBmRange.min < 30 && dBmRange.min < dBmRange.max - 1) {
-      dBmRange.min++;
-      return true;
-    }
-  } else {
-    if (dBmRange.min > -179) {
-      dBmRange.min--;
-      return true;
-    }
-  }
-  return false;
-}
-
-bool SP_UpdateGradientMax(bool inc) {
-  if (inc) {
-    if (dBmRange.max < 30) {
-      dBmRange.max++;
-      return true;
-    }
-  } else {
-    if (dBmRange.max > -179 && dBmRange.max > dBmRange.min + 1) {
-      dBmRange.max--;
-      return true;
-    }
-  }
-  return false;
-}
 
 uint16_t SP_GetNoiseFloor() { return Std(rssiHistory, filledPoints); }
 uint16_t SP_GetNoiseMax() { return Max(noiseHistory, filledPoints); }

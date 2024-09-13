@@ -58,7 +58,6 @@ void Main(void) __attribute__((noreturn));
 void _putchar(char c) { UART_SendByte((uint8_t)c); }
 
 void Main(void) {
-
   CRM_GetCoreClock();
   SCB->VTOR = (uint32_t)StackVector;
   DELAY_Init();

@@ -85,7 +85,7 @@ void ST7735S_Init(void) {
   // gColorBackground = COLOR_RGB(0, 0, 0);
   // gColorForeground = COLOR_RGB(31, 63, 31);
 
-  gpio_bits_set(GPIOF, GPIO_PINS_0);
+  /* gpio_bits_set(GPIOF, GPIO_PINS_0);
   DELAY_WaitMS(1);
 
   gpio_bits_reset(GPIOF, GPIO_PINS_0);
@@ -169,6 +169,95 @@ void ST7735S_Init(void) {
   ST7735S_SendCommand(ST7735S_CMD_COLMOD);
   ST7735S_SendData(0x05);
   DISPLAY_FillColor(COLOR_BACKGROUND);
+  ST7735S_SendCommand(ST7735S_CMD_DISPON); */
+
+  gColorBackground = COLOR_RGB(0, 0, 0);
+  gColorForeground = COLOR_RGB(31, 63, 31);
+
+  gpio_bits_set(GPIOF, GPIO_PINS_0);
+  DELAY_WaitMS(1);
+
+  gpio_bits_reset(GPIOF, GPIO_PINS_0);
+  DELAY_WaitMS(1);
+
+  gpio_bits_set(GPIOF, GPIO_PINS_0);
+  DELAY_WaitMS(120);
+
+  ST7735S_SendCommand(ST7735S_CMD_SLPOUT);
+  DELAY_WaitMS(120);
+  ST7735S_SendCommand(ST7735S_CMD_FRMCTR1);
+  ST7735S_SendData(0x05);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendCommand(ST7735S_CMD_FRMCTR2);
+  ST7735S_SendData(0x05);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendCommand(ST7735S_CMD_FRMCTR3);
+  ST7735S_SendData(0x05);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendData(0x05);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendData(0x3C);
+  ST7735S_SendCommand(ST7735S_CMD_INVCTR);
+  ST7735S_SendData(0x03);
+  ST7735S_SendCommand(ST7735S_CMD_PWCTR1);
+  ST7735S_SendData(0x28);
+  ST7735S_SendData(0x08);
+  ST7735S_SendData(0x04);
+  ST7735S_SendCommand(ST7735S_CMD_PWCTR2);
+  ST7735S_SendData(0xC0);
+  ST7735S_SendCommand(ST7735S_CMD_PWCTR3);
+  ST7735S_SendData(0x0D);
+  ST7735S_SendData(0x00);
+  ST7735S_SendCommand(ST7735S_CMD_PWCTR4);
+  ST7735S_SendData(0x8D);
+  ST7735S_SendData(0x2A);
+  ST7735S_SendCommand(ST7735S_CMD_PWCTR5);
+  ST7735S_SendData(0x8D);
+  ST7735S_SendData(0xEE);
+  ST7735S_SendCommand(ST7735S_CMD_VMCTR1);
+  ST7735S_SendData(0x1A);
+  ST7735S_SendCommand(ST7735S_CMD_MADCTL);
+  ST7735S_SendData(0xC8);
+  ST7735S_SendCommand(ST7735S_CMD_GMCTRP1);
+  ST7735S_SendData(0x04);
+  ST7735S_SendData(0x22);
+  ST7735S_SendData(0x07);
+  ST7735S_SendData(0x0A);
+  ST7735S_SendData(0x2E);
+  ST7735S_SendData(0x30);
+  ST7735S_SendData(0x25);
+  ST7735S_SendData(0x2A);
+  ST7735S_SendData(0x28);
+  ST7735S_SendData(0x26);
+  ST7735S_SendData(0x2E);
+  ST7735S_SendData(0x3A);
+  ST7735S_SendData(0x00);
+  ST7735S_SendData(0x01);
+  ST7735S_SendData(0x03);
+  ST7735S_SendData(0x13);
+  ST7735S_SendCommand(ST7735S_CMD_GMCTRN1);
+  ST7735S_SendData(0x04);
+  ST7735S_SendData(0x16);
+  ST7735S_SendData(0x06);
+  ST7735S_SendData(0x0D);
+  ST7735S_SendData(0x2D);
+  ST7735S_SendData(0x26);
+  ST7735S_SendData(0x23);
+  ST7735S_SendData(0x27);
+  ST7735S_SendData(0x27);
+  ST7735S_SendData(0x25);
+  ST7735S_SendData(0x2D);
+  ST7735S_SendData(0x3B);
+  ST7735S_SendData(0x00);
+  ST7735S_SendData(0x01);
+  ST7735S_SendData(0x04);
+  ST7735S_SendData(0x13);
+  ST7735S_SendCommand(ST7735S_CMD_COLMOD);
+  ST7735S_SendData(0x05);
+  DISPLAY_FillColor(COLOR_RGB(0, 0, 0));
   ST7735S_SendCommand(ST7735S_CMD_DISPON);
 }
 
@@ -230,4 +319,12 @@ void ST7735S_DrawFastLine(uint8_t x, uint8_t y, uint8_t length, uint16_t colour,
 
   while (length--)
     ST7735S_SendU16(colour);
+}
+
+void ST7735S_normalMode(void) {
+  ST7735S_SendCommand(0x13);
+
+  /* reset mv */
+  ST7735S_SendCommand(ST7735_MADCTL);
+  ST7735S_SendData(0xC8);
 }

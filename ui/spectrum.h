@@ -22,8 +22,6 @@ void SP_RenderRssi(uint16_t rssi, char *text, bool top, uint8_t sx, uint8_t sy,
 void SP_RenderArrow(FRange *p, uint32_t f, uint8_t sx, uint8_t sy, uint8_t sh);
 
 DBmRange SP_GetGradientRange();
-bool SP_UpdateGradientMin(bool inc);
-bool SP_UpdateGradientMax(bool inc);
 uint16_t SP_GetNoiseFloor();
 uint16_t SP_GetNoiseMax();
 

@@ -138,5 +138,6 @@ void ST7735S_defineScrollArea(uint16_t x, uint16_t x2);
 void ST7735S_scroll(uint8_t line);
 void ST7735S_DrawFastLine(uint8_t x, uint8_t y, uint8_t length, uint16_t colour,
                           uint8_t rot);
+void ST7735S_normalMode(void);
 
 #endif

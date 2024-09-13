@@ -1,4 +1,5 @@
 #include "spectrum.h"
+#include "../driver/battery.h"
 #include "../driver/bk4819.h"
 #include "../driver/delay.h"
 #include "../driver/key.h"
@@ -66,6 +67,20 @@ static inline void measure() {
   }
 }
 
+static void render() {
+  SP_Render(&range, 0, 0, 96);
+  tick = 0;
+  Int2Ascii(delayMs, 2);
+  UI_DrawSmallString(2, 96 - 13 + 4, gShortString, 2);
+
+  Int2Ascii(noiseOpenDiff, 2);
+  UI_DrawSmallString(160 - 46, 96 - 13 + 4, gShortString, 2);
+
+  gBatteryVoltage = BATTERY_GetVoltage();
+  UI_DrawStatusIcon(139, ICON_BATTERY, true, COLOR_FOREGROUND);
+  UI_DrawBattery(false);
+}
+
 static inline void toggleListening() {
   if (isListening != msm.open) {
     isListening = msm.open;
@@ -83,8 +98,7 @@ static inline void toggleListening() {
     } else {
       RADIO_EndAudio();
     }
-    SP_Render(&range, 0, 0, 128);
-    tick = 0;
+    render();
   }
 }
 
@@ -107,16 +121,14 @@ void Spectrum_Loop(void) {
   if (msm.f > range.end) {
     updateStats();
     msm.f = range.start;
-    SP_Render(&range, 0, 0, 128);
-    tick = 0;
+    render();
     SP_Begin();
     return;
   }
 
   tick++;
   if (tick >= 100) {
-    SP_Render(&range, 0, 0, 128);
-    tick = 0;
+    render();
   }
 }
 
@@ -136,31 +148,31 @@ bool CheckKeys(void) {
     case KEY_EXIT:
       running = false;
       return true;
-    case KEY_5:
+    case KEY_4:
       hard ^= 1;
       DELAY_WaitMS(100);
       return true;
     case KEY_1:
-      SP_UpdateGradientMin(true);
-      return true;
-    case KEY_7:
-      SP_UpdateGradientMin(false);
-      return true;
-    case KEY_3:
-      SP_UpdateGradientMax(true);
-      return true;
-    case KEY_9:
-      SP_UpdateGradientMax(false);
-      return true;
-    case KEY_2:
       if (delayMs < 20) {
         delayMs++;
         return true;
       }
       return false;
-    case KEY_8:
+    case KEY_7:
       if (delayMs > 1) {
         delayMs--;
+        return true;
+      }
+      return false;
+    case KEY_3:
+      if (noiseOpenDiff < 40) {
+        noiseOpenDiff++;
+        return true;
+      }
+      return false;
+    case KEY_9:
+      if (noiseOpenDiff > 1) {
+        noiseOpenDiff--;
         return true;
       }
       return false;
@@ -208,7 +220,7 @@ void APP_Spectrum(void) {
     range.end = f1;
   }
 
-  DISPLAY_Fill(0, 159, 0, 127, COLOR_BACKGROUND);
+  DISPLAY_FillColor(COLOR_BACKGROUND);
 
   catch.f = 0;
 
@@ -217,13 +229,14 @@ void APP_Spectrum(void) {
 
   running = true;
 
-  SP_Render(&range, 0, 0, 128);
+  render();
+
   while (running) {
     Spectrum_Loop();
     while (CheckKeys()) {
       SP_ResetRender();
-      SP_Render(&range, 0, 0, 128);
-      DELAY_WaitMS(10);
+      render();
+      DELAY_WaitMS(100);
     }
   }
   StopSpectrum();

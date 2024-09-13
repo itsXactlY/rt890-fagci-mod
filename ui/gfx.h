@@ -63,4 +63,10 @@ void UI_SetColors(uint8_t DarkMode);
 void DrawVLine(uint8_t x, uint8_t y, uint8_t h, uint16_t color);
 void DrawHLine(uint8_t x, uint8_t y, uint8_t h, uint16_t color);
 
+void DISPLAY_DrawRectangle0Nr(uint8_t X, uint8_t Y, uint8_t W, uint8_t H,
+                              uint16_t Color);
+void DISPLAY_DrawRectangle1Nr(uint8_t X, uint8_t Y, uint8_t H, uint8_t W,
+                              uint16_t Color);
+void DISPLAY_ResetWindow();
+
 #endif
