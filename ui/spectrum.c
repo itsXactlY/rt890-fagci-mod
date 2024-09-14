@@ -161,7 +161,7 @@ void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
   const uint16_t rssiMax = Max(rssiHistory, filledPoints);
   const uint16_t vMin = rssiMin - 1;
   const uint16_t vMax =
-      rssiMax + Clamp((rssiMax - noiseFloor), 20, rssiMax - noiseFloor);
+      rssiMax + Clamp((rssiMax - noiseFloor), 30, rssiMax - noiseFloor);
 
   dBmRange.min = Rssi2DBm(vMin);
   dBmRange.max = Rssi2DBm(vMax);
@@ -184,7 +184,7 @@ void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
   }
 }
 
-void WF_Render(bool wfDown) {
+void WF_Render(bool wfDown, uint8_t skipLastN) {
   if (wfDown) {
     for (uint8_t y = ARRAY_SIZE(wf) - 1; y > 0; --y) {
       memcpy(wf[y], wf[y - 1], ARRAY_SIZE(wf[0]));
@@ -199,14 +199,20 @@ void WF_Render(bool wfDown) {
     }
   }
 
+  // const uint8_t YMAX = ARRAY_SIZE(wf) - skipLastN - 1;
+
   ST7735S_SetAddrWindow(0, 0, 159, ARRAY_SIZE(wf) - 1);
 
   for (uint8_t x = 0; x < ARRAY_SIZE(wf[0]); ++x) {
     for (int8_t y = ARRAY_SIZE(wf) - 1; y >= 0; --y) {
-      ST7735S_SendU16(GRADIENT_PALETTE[wf[y][x] & 0xF]);
+      ST7735S_SendU16(y > ARRAY_SIZE(wf) - skipLastN
+                          ? COLOR_BACKGROUND
+                          : GRADIENT_PALETTE[wf[y][x] & 0xF]);
     }
     for (int8_t y = ARRAY_SIZE(wf) - 1; y >= 0; --y) {
-      ST7735S_SendU16(GRADIENT_PALETTE[(wf[y][x] >> 4) & 0xF]);
+      ST7735S_SendU16(y > ARRAY_SIZE(wf) - skipLastN
+                          ? COLOR_BACKGROUND
+                          : GRADIENT_PALETTE[(wf[y][x] >> 4) & 0xF]);
     }
   }
 }
@@ -270,16 +276,28 @@ bool CUR_Size(bool up) {
   return false;
 }
 
-FRange CUR_GetRange(FRange *p) {
+static uint32_t roundToStep(uint32_t f, uint32_t step) {
+  uint32_t sd = f % step;
+  if (sd > step / 2) {
+    f += step - sd;
+  } else {
+    f -= sd;
+  }
+  return f;
+}
+
+FRange CUR_GetRange(FRange *p, uint32_t step) {
   FRange range = {
       .start = ConvertDomainF(curX - curSbWidth, 0, 159, p->start, p->end),
       .end = ConvertDomainF(curX + curSbWidth, 0, 159, p->start, p->end),
   };
+  range.start = roundToStep(range.start, step);
+  range.end = roundToStep(range.end, step);
   return range;
 }
 
-uint32_t CUR_GetCenterF(FRange *p) {
-  return ConvertDomainF(curX, 0, 159, p->start, p->end);
+uint32_t CUR_GetCenterF(FRange *p, uint32_t step) {
+  return roundToStep(ConvertDomainF(curX, 0, 159, p->start, p->end), step);
 }
 
 void CUR_Reset() {

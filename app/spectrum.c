@@ -55,10 +55,8 @@ static int8_t band = 0;
 
 static inline void tuneTo(uint32_t f) {
   int8_t b = 0;
-  if (!gSettings.bUseVHF || f <= 24000000) {
-    if (!gSettings.bUseVHF && f < 24000000) {
-      b = 1;
-    }
+  if (f > 24000000) {
+    b = 1;
   } else {
     b = -1;
   }
@@ -98,25 +96,27 @@ static void drawF(uint32_t f, uint8_t x, uint8_t y, uint16_t color) {
   gColorForeground = COLOR_FOREGROUND;
 }
 
+static const uint32_t NUM_TIMEOUT = 3000;
+
 static void renderNumbers() {
-  if (gTimeSinceBoot - lastStarKeyTime < 3000) {
-    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
+  if (gTimeSinceBoot - lastStarKeyTime < NUM_TIMEOUT) {
+    // DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
     Int2Ascii(delayMs, 2);
     UI_DrawSmallString(2, 2, gShortString, 2);
 
     Int2Ascii(noiseOpenDiff, 2);
     UI_DrawSmallString(160 - 11, 2, gShortString, 2);
-  } else if (gTimeSinceBoot - lastCursorTime < 3000) {
-    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
+  } else if (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT) {
+    // DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
 
-    FRange cursorBounds = CUR_GetRange(&range);
+    FRange cursorBounds = CUR_GetRange(&range, step);
     drawF(cursorBounds.start, 2, 2, COLOR_YELLOW);
-    drawF(CUR_GetCenterF(&range), 58, 2, COLOR_YELLOW);
+    drawF(CUR_GetCenterF(&range, step), 58, 2, COLOR_YELLOW);
     drawF(cursorBounds.end, 112, 2, COLOR_YELLOW);
   } else {
-    if (catch.f || showBounds) {
+    /* if (catch.f || showBounds) {
       DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
-    }
+    } */
     if (catch.f) {
       drawF(catch.f, 58, 2, COLOR_GREEN);
     }
@@ -129,8 +129,11 @@ static void renderNumbers() {
 }
 
 static void render(bool wfDown) {
+  bool shortWf = catch.f || showBounds ||
+                 (gTimeSinceBoot - lastStarKeyTime < NUM_TIMEOUT) ||
+                 (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT);
   SP_Render(&range, 62, 30);
-  WF_Render(wfDown);
+  WF_Render(wfDown, shortWf ? 11 : 0);
   CUR_Render(56);
 
   renderNumbers();
@@ -262,7 +265,7 @@ bool CheckKeys(void) {
   if (isNewKey) {
     switch (Key) {
     case KEY_MENU:
-      newRange = CUR_GetRange(&range);
+      newRange = CUR_GetRange(&range, step);
       range = newRange;
       init();
       return true;

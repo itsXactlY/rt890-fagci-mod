@@ -70,10 +70,10 @@ static void I2C_Send(uint8_t Data) {
     } else {
       gpio_bits_reset(GPIOB, BOARD_GPIOB_BK4819_SDA);
     }
-    Delay(3);
+    Delay(10);
     gpio_bits_set(GPIOB, BOARD_GPIOB_BK4819_SCL);
     Data <<= 1;
-    Delay(3);
+    Delay(10);
   }
 }
 
@@ -90,9 +90,9 @@ static uint16_t I2C_RecvU16(void) {
     if (gpio_input_data_bit_read(GPIOB, BOARD_GPIOB_BK4819_SDA)) {
       Data |= 1;
     }
-    Delay(3);
+    Delay(10);
     gpio_bits_reset(GPIOB, BOARD_GPIOB_BK4819_SCL);
-    Delay(3);
+    Delay(10);
   }
 
   return Data;
@@ -146,7 +146,7 @@ uint16_t BK4819_ReadRegister(uint8_t Reg) {
   gpio_bits_reset(GPIOB, BOARD_GPIOB_BK4819_CS);
 
   I2C_Send(0x80U | Reg);
-  Delay(3);
+  Delay(10);
   Data = I2C_RecvU16();
 
   gpio_bits_set(GPIOB, BOARD_GPIOB_BK4819_CS);
