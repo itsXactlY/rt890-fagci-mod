@@ -445,12 +445,12 @@ void BK4819_SetFilterBandwidth(bool bIsNarrow) {
   if (gMainVfo->gModulationType == 0) { // if FM
 #ifndef ENABLE_REGISTER_EDIT
     if (bIsNarrow) {
-      BK4819_WriteRegister(0x43, 0x4048); //stock
+      BK4819_WriteRegister(0x43, 0x4048); // stock
       // BK4819_WriteRegister(0x43, 0x7B08); //kamil/fagci
       // BK4819_WriteRegister(0x43, 0x1408);
       // BK4819_WriteRegister(0x43, 0x4408); //egzumer
     } else {
-      BK4819_WriteRegister(0x43, 0x3028); //stock
+      BK4819_WriteRegister(0x43, 0x3028); // stock
       // BK4819_WriteRegister(0x43, 0x7B08); //kamil/fagci
       // BK4819_WriteRegister(0x43, 0x1408);
       // BK4819_WriteRegister(0x43, 0x45A8); //egzumer
@@ -484,6 +484,20 @@ void BK4819_EnableFilter(bool bEnable) {
     } else {
       Value &= ~GPIO_FILTER_UHF;
     }
+  }
+  BK4819_WriteRegister(0x33, Value);
+}
+
+void BK4819_SelectFilter(bool uhf) {
+  uint16_t Value;
+
+  Value = BK4819_ReadRegister(0x33);
+  Value |= 0 | GPIO_FILTER_UHF | GPIO_FILTER_VHF | GPIO_FILTER_UNKWOWN;
+
+  if (uhf) {
+    Value &= ~GPIO_FILTER_UHF;
+  } else {
+    Value &= ~GPIO_FILTER_VHF;
   }
   BK4819_WriteRegister(0x33, Value);
 }
@@ -544,13 +558,13 @@ void BK4819_RestoreGainSettings() {
   BK4819_WriteRegister(0x12, 0x037b);
   BK4819_WriteRegister(0x13, 0x03de);
   BK4819_WriteRegister(0x14, 0x0000); */
-    BK4819_WriteRegister(0x13, 0x03BE);
-    BK4819_WriteRegister(0x12, 0x037B);
-    BK4819_WriteRegister(0x11, 0x027B);
-    BK4819_WriteRegister(0x10, 0x007A);
-    BK4819_WriteRegister(0x14, 0x0019);
-    BK4819_WriteRegister(0x49, 0x2A38);
-    BK4819_WriteRegister(0x7B, 0x8420);
+  BK4819_WriteRegister(0x13, 0x03BE);
+  BK4819_WriteRegister(0x12, 0x037B);
+  BK4819_WriteRegister(0x11, 0x027B);
+  BK4819_WriteRegister(0x10, 0x007A);
+  BK4819_WriteRegister(0x14, 0x0019);
+  BK4819_WriteRegister(0x49, 0x2A38);
+  BK4819_WriteRegister(0x7B, 0x8420);
 }
 
 void BK4819_ToggleAGCMode() {

@@ -27,6 +27,8 @@ uint16_t COLOR_RED;
 uint16_t COLOR_GREEN;
 uint16_t COLOR_BLUE;
 uint16_t COLOR_GREY;
+uint16_t COLOR_GREY_DARK;
+uint16_t COLOR_YELLOW;
 
 void DISPLAY_FillNoReset(uint8_t X0, uint8_t X1, uint8_t Y0, uint8_t Y1,
                          uint16_t Color) {
@@ -78,6 +80,8 @@ void UI_SetColors(uint8_t DarkMode) {
   COLOR_GREEN = COLOR_RGB(0, 63, 0);
   COLOR_BLUE = COLOR_RGB(7, 15, 31);
   COLOR_GREY = COLOR_RGB(16, 32, 16);
+  COLOR_GREY_DARK = COLOR_RGB(8, 16, 8);
+  COLOR_YELLOW = COLOR_RGB(31, 63, 0);
 
   gColorBackground = COLOR_BACKGROUND;
   gColorForeground = COLOR_FOREGROUND;

@@ -35,8 +35,12 @@ static uint16_t noiseOpenDiff = 14;
 static Loot catch = {0};
 static bool isListening = false;
 
+static KEY_t LastKey;
 static uint32_t lastBatRender;
-static uint32_t lastKeyTime = 0;
+static uint32_t lastStarKeyTime = 0;
+static uint32_t lastCursorTime = 0;
+
+static bool showBounds = false;
 
 static void updateStats() {
   const uint16_t noiseFloor = SP_GetNoiseFloor();
@@ -60,7 +64,7 @@ static inline void tuneTo(uint32_t f) {
   }
   if (b != band) {
     band = b;
-    FREQUENCY_SelectBand(b > 0 ? f * 2 : f / 2);
+    BK4819_SelectFilter(b > 0);
   }
   BK4819_WriteRegister(0x38, (f >> 0) & 0xFFFF);
   BK4819_WriteRegister(0x39, (f >> 16) & 0xFFFF);
@@ -85,16 +89,51 @@ static inline void measure() {
   }
 }
 
-static void render() {
-  SP_Render(&range, 0, 0, 96);
+static void drawF(uint32_t f, uint8_t x, uint8_t y, uint16_t color) {
+  Int2Ascii(f, 8);
+  ShiftShortStringRight(2, 7);
+  gShortString[3] = '.';
+  gColorForeground = color;
+  UI_DrawSmallString(x, y, gShortString, 8);
+  gColorForeground = COLOR_FOREGROUND;
+}
 
-  if (gTimeSinceBoot - lastKeyTime < 3000) {
+static void renderNumbers() {
+  if (gTimeSinceBoot - lastStarKeyTime < 3000) {
+    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
     Int2Ascii(delayMs, 2);
-    UI_DrawSmallString(2, 96 - 13 + 4, gShortString, 2);
+    UI_DrawSmallString(2, 2, gShortString, 2);
 
     Int2Ascii(noiseOpenDiff, 2);
-    UI_DrawSmallString(160 - 11, 96 - 13 + 4, gShortString, 2);
+    UI_DrawSmallString(160 - 11, 2, gShortString, 2);
+  } else if (gTimeSinceBoot - lastCursorTime < 3000) {
+    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
+
+    FRange cursorBounds = CUR_GetRange(&range);
+    drawF(cursorBounds.start, 2, 2, COLOR_YELLOW);
+    drawF(CUR_GetCenterF(&range), 58, 2, COLOR_YELLOW);
+    drawF(cursorBounds.end, 112, 2, COLOR_YELLOW);
+  } else {
+    if (catch.f || showBounds) {
+      DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
+    }
+    if (catch.f) {
+      drawF(catch.f, 58, 2, COLOR_GREEN);
+    }
+
+    if (showBounds) {
+      drawF(range.start, 2, 2, COLOR_FOREGROUND);
+      drawF(range.end, 112, 2, COLOR_FOREGROUND);
+    }
   }
+}
+
+static void render(bool wfDown) {
+  SP_Render(&range, 62, 30);
+  WF_Render(wfDown);
+  CUR_Render(56);
+
+  renderNumbers();
 
   if (gTimeSinceBoot - lastBatRender > 2000) {
     lastBatRender = gTimeSinceBoot;
@@ -104,24 +143,31 @@ static void render() {
   lastRender = gTimeSinceBoot;
 }
 
+static void init() {
+  DISPLAY_FillColor(COLOR_BACKGROUND);
+
+  catch.f = 0;
+
+  msm.f = range.start;
+  SP_Init((range.end - range.start) / step, 160);
+  CUR_Reset();
+
+  running = true;
+
+  render(false);
+}
+
 static inline void toggleListening() {
   if (isListening != msm.open) {
     isListening = msm.open;
     if (isListening) {
       catch = msm;
 
-      Int2Ascii(catch.f, 8);
-      ShiftShortStringRight(2, 7);
-      gShortString[3] = '.';
-      gColorForeground = COLOR_GREEN;
-      UI_DrawSmallString(58, 2, gShortString, 8);
-      gColorForeground = COLOR_FOREGROUND;
-
       BK4819_StartAudio();
     } else {
       RADIO_EndAudio();
     }
-    render();
+    render(true);
   }
 }
 
@@ -144,7 +190,7 @@ void Spectrum_Loop(void) {
   if (msm.f > range.end) {
     updateStats();
     msm.f = range.start;
-    render();
+    render(true);
     SP_Begin();
     return;
   }
@@ -154,54 +200,84 @@ void Spectrum_Loop(void) {
   } */
 }
 
+static uint32_t keyHoldTime = 0;
+static bool keyHold = false;
+
 bool CheckKeys(void) {
-  static uint8_t KeyHoldTimer;
   static KEY_t Key;
-  static KEY_t LastKey;
 
   Key = KEY_GetButton();
-  if (Key == LastKey && Key != KEY_NONE) {
-    KeyHoldTimer += 10;
+  if (Key != LastKey && Key != KEY_NONE) {
+    keyHoldTime = gTimeSinceBoot;
   }
 
-  if (Key != LastKey || KeyHoldTimer >= 50) {
-    KeyHoldTimer = 0;
+  FRange newRange;
+  keyHold = Key == LastKey && gTimeSinceBoot - keyHoldTime >= 500;
+  bool isNewKey = Key != LastKey;
+
+  LastKey = Key;
+
+  if (isNewKey || keyHold) {
     switch (Key) {
-    case KEY_EXIT:
-      running = false;
-      return true;
-    case KEY_4:
-      hard ^= 1;
-      DELAY_WaitMS(100);
-      return true;
+    case KEY_UP:
+      return CUR_Move(true);
+    case KEY_DOWN:
+      return CUR_Move(false);
+    case KEY_2:
+      return CUR_Size(true);
+    case KEY_8:
+      return CUR_Size(false);
     case KEY_1:
       if (delayMs < 20) {
         delayMs++;
+        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
     case KEY_7:
       if (delayMs > 1) {
         delayMs--;
+        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
     case KEY_3:
       if (noiseOpenDiff < 40) {
         noiseOpenDiff++;
+        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
     case KEY_9:
       if (noiseOpenDiff > 1) {
         noiseOpenDiff--;
+        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
     default:
       break;
     }
-    LastKey = Key;
+  }
+  if (isNewKey) {
+    switch (Key) {
+    case KEY_MENU:
+      newRange = CUR_GetRange(&range);
+      range = newRange;
+      init();
+      return true;
+    case KEY_4:
+      hard ^= 1;
+      return true;
+    case KEY_STAR:
+      showBounds ^= 1;
+      return true;
+    case KEY_EXIT:
+      running = false;
+      return true;
+    default:
+      break;
+    }
   }
   return false;
 }
@@ -228,6 +304,7 @@ void StopSpectrum(void) {
 
 void APP_Spectrum(void) {
   RADIO_EndAudio(); // Just in case audio is open when spectrum starts
+  RADIO_Tune(gSettings.CurrentVfo);
   vfo = &gVfoState[gSettings.CurrentVfo];
   uint32_t f1 = gVfoState[0].RX.Frequency;
   uint32_t f2 = gVfoState[1].RX.Frequency;
@@ -242,24 +319,20 @@ void APP_Spectrum(void) {
     range.end = f1;
   }
 
-  DISPLAY_FillColor(COLOR_BACKGROUND);
-
-  catch.f = 0;
-
-  msm.f = range.start;
-  SP_Init((range.end - range.start) / step, 160);
-
-  running = true;
-
-  render();
+  init();
 
   while (running) {
     Spectrum_Loop();
     while (CheckKeys()) {
-      lastKeyTime = gTimeSinceBoot;
-      // SP_ResetRender();
-      render();
-      DELAY_WaitMS(100);
+      if (LastKey == KEY_UP || LastKey == KEY_DOWN || LastKey == KEY_2 ||
+          LastKey == KEY_8) {
+        CUR_Render(56);
+        renderNumbers();
+        lastCursorTime = gTimeSinceBoot;
+      } else {
+        render(false);
+      }
+      DELAY_WaitMS(keyHold ? 5 : 300);
     }
   }
   StopSpectrum();

@@ -57,6 +57,7 @@ void BK4819_SetSquelchRSSI(bool bIsNarrow);
 void BK4819_ToggleAGCMode(void);
 void BK4819_RestoreGainSettings();
 void BK4819_SetFilterBandwidth(bool bIsNarrow);
+void BK4819_SelectFilter(bool uhf);
 void BK4819_EnableFilter(bool bEnable);
 void BK4819_EnableScramble(uint8_t Scramble);
 void BK4819_EnableCompander(bool bIsNarrow);
