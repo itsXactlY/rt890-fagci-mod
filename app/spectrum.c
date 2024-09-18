@@ -19,7 +19,6 @@
 static const uint16_t U16_MAX = 65535;
 
 static bool running;
-static ChannelInfo_t *vfo;
 static uint32_t step;
 static uint8_t stepIndex;
 static Loot msm;
@@ -45,9 +44,9 @@ static FRange rangesStack[RANGES_STACK_SIZE] = {0};
 static int8_t rangesStackIndex = -1;
 
 #define LOOT_MAX 64
-Loot lootList[LOOT_MAX] = {};
-uint8_t lootListSize = 0;
-Loot *gLastActiveLoot;
+static Loot lootList[LOOT_MAX] = {};
+static uint8_t lootListSize = 0;
+static Loot *gLastActiveLoot;
 
 void LOOT_BlacklistLast(void) {
   if (gLastActiveLoot) {
@@ -210,23 +209,21 @@ static const uint32_t NUM_TIMEOUT = 3000;
 
 static void renderNumbers() {
   if (gTimeSinceBoot - lastStarKeyTime < NUM_TIMEOUT) {
-    // DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
+    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
     Int2Ascii(delayMs, 2);
     UI_DrawSmallString(2, 2, gShortString, 2);
 
     Int2Ascii(noiseOpenDiff, 2);
     UI_DrawSmallString(160 - 11, 2, gShortString, 2);
   } else if (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT) {
-    // DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
+    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
 
     FRange cursorBounds = CUR_GetRange(rangePeek(), step);
     drawF(cursorBounds.start, 2, 2, COLOR_YELLOW);
     drawF(CUR_GetCenterF(rangePeek(), step), 58, 2, COLOR_YELLOW);
     drawF(cursorBounds.end, 112, 2, COLOR_YELLOW);
   } else {
-    /* if (catch.f || showBounds) {
-      DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
-    } */
+    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
     if (catch.f) {
       drawF(catch.f, 58, 2, COLOR_GREEN);
     } else {
@@ -240,9 +237,6 @@ static void renderNumbers() {
 }
 
 static void render(bool wfDown) {
-  /* bool shortWf = catch.f || showBounds ||
-                 (gTimeSinceBoot - lastStarKeyTime < NUM_TIMEOUT) ||
-                 (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT); */
   SP_Render(rangePeek(), 62, 30);
   WF_Render(wfDown, 0);
   CUR_Render(56);
@@ -319,20 +313,18 @@ static uint32_t keyHoldTime = 0;
 static bool keyHold = false;
 
 bool CheckKeys(void) {
-  static KEY_t Key;
-
-  Key = KEY_GetButton();
-  if (Key != LastKey && Key != KEY_NONE) {
+  KEY_t key = KEY_GetButton();
+  if (key != LastKey && key != KEY_NONE) {
     keyHoldTime = gTimeSinceBoot;
   }
 
-  keyHold = Key == LastKey && gTimeSinceBoot - keyHoldTime >= 500;
-  bool isNewKey = Key != LastKey;
+  keyHold = key == LastKey && gTimeSinceBoot - keyHoldTime >= 500;
+  bool isNewKey = key != LastKey;
 
-  LastKey = Key;
+  LastKey = key;
 
   if (isNewKey || keyHold) {
-    switch (Key) {
+    switch (key) {
     case KEY_UP:
       return CUR_Move(true);
     case KEY_DOWN:
@@ -374,7 +366,7 @@ bool CheckKeys(void) {
     }
   }
   if (isNewKey) {
-    switch (Key) {
+    switch (key) {
     case KEY_MENU:
       if (rangesStackIndex < RANGES_STACK_SIZE - 1) {
         rangePush(CUR_GetRange(rangePeek(), step));
@@ -403,6 +395,10 @@ bool CheckKeys(void) {
     case KEY_6:
       if (stepIndex < 13) {
         stepIndex++;
+        step = FREQUENCY_GetStep(stepIndex);
+        if (step > rangePeek()->end - rangePeek()->start) {
+          stepIndex = 0;
+        }
       } else {
         stepIndex = 0;
       }
@@ -439,22 +435,17 @@ void StopSpectrum(void) {
 void APP_Spectrum(void) {
   RADIO_EndAudio(); // Just in case audio is open when spectrum starts
   RADIO_Tune(gSettings.CurrentVfo);
-  vfo = &gVfoState[gSettings.CurrentVfo];
   uint32_t f1 = gVfoState[0].RX.Frequency;
   uint32_t f2 = gVfoState[1].RX.Frequency;
 
   stepIndex = gSettings.FrequencyStep;
   step = FREQUENCY_GetStep(stepIndex);
   rangeClear();
-  FRange r;
-  rangePush(r);
 
   if (f1 < f2) {
-    rangePeek()->start = f1;
-    rangePeek()->end = f2;
+    rangePush((FRange){f1, f2});
   } else {
-    rangePeek()->start = f2;
-    rangePeek()->end = f1;
+    rangePush((FRange){f2, f1});
   }
 
   init();

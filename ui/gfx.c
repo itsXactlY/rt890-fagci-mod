@@ -14,9 +14,8 @@
  *     limitations under the License.
  */
 
-#include "ui/gfx.h"
-#include "driver/st7735s.h"
-#include "misc.h"
+#include "../ui/gfx.h"
+#include "../driver/st7735s.h"
 
 uint16_t gColorForeground;
 uint16_t gColorBackground;

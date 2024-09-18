@@ -2,7 +2,6 @@
 #include "../driver/st7735s.h"
 #include "../helper/helper.h"
 #include "../ui/gfx.h"
-#include "../ui/helper.h"
 #include <string.h>
 
 #define MAX_POINTS 160
@@ -54,8 +53,11 @@ static uint32_t ConvertDomainF(uint32_t aValue, uint32_t aMin, uint32_t aMax,
 }
 
 void SP_ResetHistory(void) {
+  for (uint8_t y = 0; y < ARRAY_SIZE(wf); ++y) {
+    memset(wf[y], 0, ARRAY_SIZE(wf[0]));
+  }
   for (uint8_t i = 0; i < MAX_POINTS; ++i) {
-    rssiHistory[i] = 0;
+    py[i] = opy[i] = osy[i] = rssiHistory[i] = 0;
     noiseHistory[i] = UINT16_MAX;
     markers[i] = false;
     needRedraw[i] = false;
@@ -80,15 +82,13 @@ void SP_Next(void) {
 }
 
 void SP_Init(uint32_t steps, uint8_t width) {
+  filledPoints = 0;
   stepsCount = steps;
   historySize = width;
   exLen = ceilDiv(historySize, stepsCount);
   SP_ResetHistory();
   SP_Begin();
   ticksRendered = false;
-  for (uint8_t y = 0; y < ARRAY_SIZE(wf); ++y) {
-    memset(wf[y], 0, ARRAY_SIZE(wf[0]));
-  }
 }
 
 void SP_AddPoint(Loot *msm) {
@@ -278,13 +278,15 @@ bool CUR_Size(bool up) {
   return false;
 }
 
-static uint32_t roundToStep(uint32_t f, uint32_t step) {
+static uint32_t roundToStepDown(uint32_t f, uint32_t step) {
   uint32_t sd = f % step;
-  if (sd > step / 2) {
-    f += step - sd;
-  } else {
-    f -= sd;
-  }
+  f -= sd;
+  return f;
+}
+
+static uint32_t roundToStepUp(uint32_t f, uint32_t step) {
+  uint32_t sd = f % step;
+  f += step - sd;
   return f;
 }
 
@@ -293,13 +295,13 @@ FRange CUR_GetRange(FRange *p, uint32_t step) {
       .start = ConvertDomainF(curX - curSbWidth, 0, 159, p->start, p->end),
       .end = ConvertDomainF(curX + curSbWidth, 0, 159, p->start, p->end),
   };
-  range.start = roundToStep(range.start, step);
-  range.end = roundToStep(range.end, step);
+  range.start = roundToStepDown(range.start, step);
+  range.end = roundToStepUp(range.end, step);
   return range;
 }
 
 uint32_t CUR_GetCenterF(FRange *p, uint32_t step) {
-  return roundToStep(ConvertDomainF(curX, 0, 159, p->start, p->end), step);
+  return roundToStepDown(ConvertDomainF(curX, 0, 159, p->start, p->end), step);
 }
 
 void CUR_Reset() {

@@ -96,7 +96,7 @@ void Main(void) {
         Task_CheckNOAA();
 #endif
         Task_LocalAlarm();
-        DELAY_WaitMS(10);
+        DELAY_WaitMS(1);
       }
     } while (gSettings.DtmfState != DTMF_STATE_KILLED);
     if (BK4819_ReadRegister(0x0C) & 0x0001U) {
