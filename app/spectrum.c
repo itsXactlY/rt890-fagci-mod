@@ -21,6 +21,7 @@ static const uint16_t U16_MAX = 65535;
 static bool running;
 static ChannelInfo_t *vfo;
 static uint32_t step;
+static uint8_t stepIndex;
 static Loot msm;
 
 static uint16_t rssiO = U16_MAX;
@@ -38,8 +39,6 @@ static KEY_t LastKey;
 static uint32_t lastBatRender;
 static uint32_t lastStarKeyTime = 0;
 static uint32_t lastCursorTime = 0;
-
-static bool showBounds = false;
 
 #define RANGES_STACK_SIZE 4
 static FRange rangesStack[RANGES_STACK_SIZE] = {0};
@@ -230,12 +229,13 @@ static void renderNumbers() {
     } */
     if (catch.f) {
       drawF(catch.f, 58, 2, COLOR_GREEN);
+    } else {
+
+      drawF(step, 58, 2, COLOR_FOREGROUND);
     }
 
-    if (showBounds) {
-      drawF(rangePeek()->start, 2, 2, COLOR_FOREGROUND);
-      drawF(rangePeek()->end, 112, 2, COLOR_FOREGROUND);
-    }
+    drawF(rangePeek()->start, 2, 2, COLOR_FOREGROUND);
+    drawF(rangePeek()->end, 112, 2, COLOR_FOREGROUND);
   }
 }
 
@@ -385,9 +385,6 @@ bool CheckKeys(void) {
     case KEY_4:
       hard ^= 1;
       return true;
-    case KEY_STAR:
-      showBounds ^= 1;
-      return true;
     case KEY_EXIT:
       if (rangesStackIndex <= 0) {
         running = false;
@@ -402,6 +399,15 @@ bool CheckKeys(void) {
       isListening = false;
       catch.f = 0;
       nextFreq();
+      return true;
+    case KEY_6:
+      if (stepIndex < 13) {
+        stepIndex++;
+      } else {
+        stepIndex = 0;
+      }
+      step = FREQUENCY_GetStep(stepIndex);
+      init();
       return true;
     default:
       break;
@@ -437,7 +443,8 @@ void APP_Spectrum(void) {
   uint32_t f1 = gVfoState[0].RX.Frequency;
   uint32_t f2 = gVfoState[1].RX.Frequency;
 
-  step = FREQUENCY_GetStep(gSettings.FrequencyStep);
+  stepIndex = gSettings.FrequencyStep;
+  step = FREQUENCY_GetStep(stepIndex);
   rangeClear();
   FRange r;
   rangePush(r);
