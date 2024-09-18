@@ -3,7 +3,6 @@
 #include "../driver/bk4819.h"
 #include "../driver/delay.h"
 #include "../driver/key.h"
-#include "../driver/speaker.h"
 #include "../driver/st7735s.h"
 #include "../helper/helper.h"
 #include "../misc.h"
@@ -15,12 +14,12 @@
 #include "../ui/main.h"
 #include "../ui/spectrum.h"
 #include "radio.h"
+#include <stddef.h>
 
 static const uint16_t U16_MAX = 65535;
 
 static bool running;
 static ChannelInfo_t *vfo;
-static FRange range;
 static uint32_t step;
 static Loot msm;
 
@@ -42,6 +41,122 @@ static uint32_t lastCursorTime = 0;
 
 static bool showBounds = false;
 
+#define RANGES_STACK_SIZE 4
+static FRange rangesStack[RANGES_STACK_SIZE] = {0};
+static int8_t rangesStackIndex = -1;
+
+#define LOOT_MAX 64
+Loot lootList[LOOT_MAX] = {};
+uint8_t lootListSize = 0;
+Loot *gLastActiveLoot;
+
+void LOOT_BlacklistLast(void) {
+  if (gLastActiveLoot) {
+    gLastActiveLoot->goodKnown = false;
+    gLastActiveLoot->blacklist = true;
+  }
+}
+
+void LOOT_GoodKnownLast(void) {
+  if (gLastActiveLoot) {
+    gLastActiveLoot->blacklist = false;
+    gLastActiveLoot->goodKnown = true;
+  }
+}
+
+Loot *LOOT_Get(uint32_t f) {
+  for (uint8_t i = 0; i < lootListSize; ++i) {
+    if (f == lootList[i].f) {
+      return &lootList[i];
+    }
+  }
+  return NULL;
+}
+
+void LOOT_Update(Loot *m) {
+  Loot *item = LOOT_Get(m->f);
+
+  if (!item && m->open && lootListSize < LOOT_MAX) {
+    lootList[lootListSize] = *m;
+    item = &lootList[lootListSize];
+    lootListSize++;
+  }
+
+  if (!item) {
+    return;
+  }
+
+  if (item->blacklist || item->goodKnown) {
+    m->open = false;
+  }
+
+  item->rssi = m->rssi;
+
+  if (item->open) {
+    // item->duration += gTimeSinceBoot - item->lastTimeCheck;
+    gLastActiveLoot = item;
+  }
+  if (m->open) {
+    /* uint32_t cd = 0;
+    uint16_t ct = 0;
+    uint8_t Code = 0; */
+    /* BK4819_CssScanResult_t res = BK4819_GetCxCSSScanResult(&cd, &ct);
+    switch (res) {
+    case BK4819_CSS_RESULT_CDCSS:
+      Code = DCS_GetCdcssCode(cd);
+      if (Code != 0xFF) {
+        item->cd = Code;
+      }
+      break;
+    case BK4819_CSS_RESULT_CTCSS:
+      Code = DCS_GetCtcssCode(ct);
+      if (Code != 0xFF) {
+        item->ct = Code;
+      }
+      break;
+    default:
+      break;
+    } */
+    // item->lastTimeOpen = gTimeSinceBoot;
+  }
+  // item->lastTimeCheck = gTimeSinceBoot;
+  item->open = m->open;
+  m->ct = item->ct;
+  m->cd = item->cd;
+
+  if (m->blacklist) {
+    item->blacklist = true;
+  }
+}
+
+static void rangeClear() { rangesStackIndex = -1; }
+
+static bool rangePush(FRange r) {
+  if (rangesStackIndex < RANGES_STACK_SIZE - 1) {
+    rangesStack[++rangesStackIndex] = r;
+  } else {
+    for (uint8_t i = 1; i < RANGES_STACK_SIZE; ++i) {
+      rangesStack[i - 1] = rangesStack[i];
+    }
+    rangesStack[rangesStackIndex] = r;
+  }
+  return true;
+}
+
+static FRange rangePop(void) {
+  if (rangesStackIndex > 0) {
+    return rangesStack[rangesStackIndex--]; // Do not care about existing value
+  }
+  return rangesStack[rangesStackIndex];
+}
+
+static FRange *rangePeek(void) {
+  if (rangesStackIndex >= 0) {
+    return &rangesStack[rangesStackIndex];
+  }
+  return NULL;
+}
+
 static void updateStats() {
   const uint16_t noiseFloor = SP_GetNoiseFloor();
   const uint16_t noiseMax = SP_GetNoiseMax();
@@ -54,12 +169,7 @@ static bool isSquelchOpen() { return msm.rssi >= rssiO && msm.noise <= noiseO; }
 static int8_t band = 0;
 
 static inline void tuneTo(uint32_t f) {
-  int8_t b = 0;
-  if (f > 24000000) {
-    b = 1;
-  } else {
-    b = -1;
-  }
+  int8_t b = f >= 24000000 ? 1 : -1;
   if (b != band) {
     band = b;
     BK4819_SelectFilter(b > 0);
@@ -85,6 +195,7 @@ static inline void measure() {
   } else {
     msm.open = isSquelchOpen();
   }
+  LOOT_Update(&msm);
 }
 
 static void drawF(uint32_t f, uint8_t x, uint8_t y, uint16_t color) {
@@ -109,9 +220,9 @@ static void renderNumbers() {
   } else if (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT) {
     // DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
 
-    FRange cursorBounds = CUR_GetRange(&range, step);
+    FRange cursorBounds = CUR_GetRange(rangePeek(), step);
     drawF(cursorBounds.start, 2, 2, COLOR_YELLOW);
-    drawF(CUR_GetCenterF(&range, step), 58, 2, COLOR_YELLOW);
+    drawF(CUR_GetCenterF(rangePeek(), step), 58, 2, COLOR_YELLOW);
     drawF(cursorBounds.end, 112, 2, COLOR_YELLOW);
   } else {
     /* if (catch.f || showBounds) {
@@ -122,18 +233,18 @@ static void renderNumbers() {
     }
 
     if (showBounds) {
-      drawF(range.start, 2, 2, COLOR_FOREGROUND);
-      drawF(range.end, 112, 2, COLOR_FOREGROUND);
+      drawF(rangePeek()->start, 2, 2, COLOR_FOREGROUND);
+      drawF(rangePeek()->end, 112, 2, COLOR_FOREGROUND);
     }
   }
 }
 
 static void render(bool wfDown) {
-  bool shortWf = catch.f || showBounds ||
+  /* bool shortWf = catch.f || showBounds ||
                  (gTimeSinceBoot - lastStarKeyTime < NUM_TIMEOUT) ||
-                 (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT);
-  SP_Render(&range, 62, 30);
-  WF_Render(wfDown, shortWf ? 11 : 0);
+                 (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT); */
+  SP_Render(rangePeek(), 62, 30);
+  WF_Render(wfDown, 0);
   CUR_Render(56);
 
   renderNumbers();
@@ -146,13 +257,26 @@ static void render(bool wfDown) {
   lastRender = gTimeSinceBoot;
 }
 
+static void nextFreq() {
+  msm.f += step;
+  SP_Next();
+
+  if (msm.f > rangePeek()->end) {
+    updateStats();
+    msm.f = rangePeek()->start;
+    render(true);
+    SP_Begin();
+    return;
+  }
+}
+
 static void init() {
   DISPLAY_FillColor(COLOR_BACKGROUND);
 
   catch.f = 0;
 
-  msm.f = range.start;
-  SP_Init((range.end - range.start) / step, 160);
+  msm.f = rangePeek()->start;
+  SP_Init((rangePeek()->end - rangePeek()->start) / step, 160);
   CUR_Reset();
 
   running = true;
@@ -184,23 +308,11 @@ void Spectrum_Loop(void) {
   toggleListening();
 
   if (isListening) {
+    render(false);
     return;
   }
 
-  msm.f += step;
-  SP_Next();
-
-  if (msm.f > range.end) {
-    updateStats();
-    msm.f = range.start;
-    render(true);
-    SP_Begin();
-    return;
-  }
-
-  /* if (gTimeSinceBoot - lastRender >= 500) {
-    render();
-  } */
+  nextFreq();
 }
 
 static uint32_t keyHoldTime = 0;
@@ -214,7 +326,6 @@ bool CheckKeys(void) {
     keyHoldTime = gTimeSinceBoot;
   }
 
-  FRange newRange;
   keyHold = Key == LastKey && gTimeSinceBoot - keyHoldTime >= 500;
   bool isNewKey = Key != LastKey;
 
@@ -265,10 +376,12 @@ bool CheckKeys(void) {
   if (isNewKey) {
     switch (Key) {
     case KEY_MENU:
-      newRange = CUR_GetRange(&range, step);
-      range = newRange;
-      init();
-      return true;
+      if (rangesStackIndex < RANGES_STACK_SIZE - 1) {
+        rangePush(CUR_GetRange(rangePeek(), step));
+        init();
+        return true;
+      }
+      break;
     case KEY_4:
       hard ^= 1;
       return true;
@@ -276,7 +389,19 @@ bool CheckKeys(void) {
       showBounds ^= 1;
       return true;
     case KEY_EXIT:
-      running = false;
+      if (rangesStackIndex <= 0) {
+        running = false;
+      } else {
+        rangePop();
+        init();
+      }
+      return true;
+    case KEY_HASH:
+      LOOT_BlacklistLast();
+      RADIO_EndAudio();
+      isListening = false;
+      catch.f = 0;
+      nextFreq();
       return true;
     default:
       break;
@@ -313,13 +438,16 @@ void APP_Spectrum(void) {
   uint32_t f2 = gVfoState[1].RX.Frequency;
 
   step = FREQUENCY_GetStep(gSettings.FrequencyStep);
+  rangeClear();
+  FRange r;
+  rangePush(r);
 
   if (f1 < f2) {
-    range.start = f1;
-    range.end = f2;
+    rangePeek()->start = f1;
+    rangePeek()->end = f2;
   } else {
-    range.start = f2;
-    range.end = f1;
+    rangePeek()->start = f2;
+    rangePeek()->end = f1;
   }
 
   init();

@@ -23,7 +23,7 @@ static DBmRange dBmRange = {-150, -40};
 
 static bool ticksRendered = false;
 
-static uint8_t wf[56][80] = {0};
+static uint8_t wf[45][80] = {0};
 static uint8_t osy[160] = {0};
 
 static uint8_t py[160] = {0};
@@ -133,10 +133,10 @@ static void drawTicks(uint8_t y, uint32_t fs, uint32_t fe, uint32_t div,
     uint8_t x = ConvertDomainF(f, fs, fe, 0, 159);
     ST7735S_SetAddrWindow(x, y, x, y + h - 1);
     for (uint8_t yp = y; yp < y + h; ++yp) {
-      ST7735S_SendU16(yp % 2 ? c : COLOR_BACKGROUND);
+      ST7735S_SendU16(yp / 2 % 2 ? c : COLOR_BACKGROUND);
     }
-    DISPLAY_ResetWindow();
   }
+  DISPLAY_ResetWindow();
 }
 
 static void SP_DrawTicks(uint8_t y, uint8_t h, FRange *range) {
@@ -144,11 +144,11 @@ static void SP_DrawTicks(uint8_t y, uint8_t h, FRange *range) {
   uint32_t fe = range->end;
   uint32_t bw = fe - fs;
   const uint16_t c1 = COLOR_GREY;
-  const uint16_t c2 = COLOR_GREY_DARK;
+  // const uint16_t c2 = COLOR_GREY_DARK;
 
   for (uint32_t p = 100000000; p >= 10; p /= 10) {
     if (bw > p) {
-      drawTicks(y, fs, fe, p / 2, h, c2);
+      // drawTicks(y, fs, fe, p / 2, h, c2);
       drawTicks(y, fs, fe, p, h, c1);
       return;
     }
@@ -161,7 +161,7 @@ void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
   const uint16_t rssiMax = Max(rssiHistory, filledPoints);
   const uint16_t vMin = rssiMin - 1;
   const uint16_t vMax =
-      rssiMax + Clamp((rssiMax - noiseFloor), 30, rssiMax - noiseFloor);
+      rssiMax + Clamp((rssiMax - noiseFloor), 40, rssiMax - noiseFloor);
 
   dBmRange.min = Rssi2DBm(vMin);
   dBmRange.max = Rssi2DBm(vMax);
@@ -172,16 +172,17 @@ void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
       py[i] = yVal;
     }
     if (yVal < osy[i]) {
-      DISPLAY_DrawRectangle1(i, 62 + yVal, osy[i] - yVal, exLen,
-                             COLOR_BACKGROUND);
+      DISPLAY_DrawRectangle1Nr(i, 62 + yVal, osy[i] - yVal, exLen,
+                               COLOR_BACKGROUND);
     }
     osy[i] = yVal;
     opy[i] = py[i];
   }
   SP_DrawTicks(sy, sh, p);
   for (uint8_t i = 0; i < filledPoints; i += exLen) {
-    DISPLAY_DrawRectangle1(i, sy, osy[i], exLen, COLOR_FOREGROUND);
+    DISPLAY_DrawRectangle1Nr(i, sy, osy[i], exLen, COLOR_FOREGROUND);
   }
+  DISPLAY_ResetWindow();
 }
 
 void WF_Render(bool wfDown, uint8_t skipLastN) {
@@ -201,7 +202,7 @@ void WF_Render(bool wfDown, uint8_t skipLastN) {
 
   // const uint8_t YMAX = ARRAY_SIZE(wf) - skipLastN - 1;
 
-  ST7735S_SetAddrWindow(0, 0, 159, ARRAY_SIZE(wf) - 1);
+  ST7735S_SetAddrWindow(0, 11, 159, 11 + ARRAY_SIZE(wf) - 1);
 
   for (uint8_t x = 0; x < ARRAY_SIZE(wf[0]); ++x) {
     for (int8_t y = ARRAY_SIZE(wf) - 1; y >= 0; --y) {
@@ -236,14 +237,15 @@ void CUR_Render(uint8_t y) {
   y++;
   DISPLAY_Fill(curX - curSbWidth + 1, curX + curSbWidth - 1, y, y + 4 - 1,
                COLOR_RGB(8, 16, 0));
-  DISPLAY_DrawRectangle1(curX - curSbWidth, y, 4, 1, COLOR_YELLOW);
-  DISPLAY_DrawRectangle1(curX + curSbWidth, y, 4, 1, COLOR_YELLOW);
+  DISPLAY_DrawRectangle1Nr(curX - curSbWidth, y, 4, 1, COLOR_YELLOW);
+  DISPLAY_DrawRectangle1Nr(curX + curSbWidth, y, 4, 1, COLOR_YELLOW);
 
-  DISPLAY_DrawRectangle1(curX, y, 4, 1, COLOR_YELLOW);
+  DISPLAY_DrawRectangle1Nr(curX, y, 4, 1, COLOR_YELLOW);
   for (uint8_t d = 1; d < 4; ++d) {
-    DISPLAY_DrawRectangle1(curX - d, y + d, 4 - d, 1, COLOR_YELLOW);
-    DISPLAY_DrawRectangle1(curX + d, y + d, 4 - d, 1, COLOR_YELLOW);
+    DISPLAY_DrawRectangle1Nr(curX - d, y + d, 4 - d, 1, COLOR_YELLOW);
+    DISPLAY_DrawRectangle1Nr(curX + d, y + d, 4 - d, 1, COLOR_YELLOW);
   }
+  DISPLAY_ResetWindow();
 }
 
 bool CUR_Move(bool up) {
