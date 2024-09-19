@@ -6,6 +6,8 @@
 
 #define MAX_POINTS 160
 
+static const uint16_t noiseMax = 100;
+
 static uint16_t rssiHistory[MAX_POINTS] = {0};
 static uint16_t noiseHistory[MAX_POINTS] = {0};
 static bool markers[MAX_POINTS] = {0};
@@ -23,10 +25,10 @@ static DBmRange dBmRange = {-150, -40};
 static bool ticksRendered = false;
 
 static uint8_t wf[45][80] = {0};
-static uint8_t osy[160] = {0};
+static uint16_t osy[160] = {0};
 
-static uint8_t py[160] = {0};
-static uint8_t opy[160] = {0};
+static uint16_t py[160] = {0};
+static uint16_t opy[160] = {0};
 
 static const int16_t GRADIENT_PALETTE[] = {
     0x2000, 0x3000, 0x5000, 0x9000, 0xfc44, 0xffbf, 0x7bf, 0x1b5f,
@@ -36,6 +38,10 @@ static const int16_t GRADIENT_PALETTE[] = {
 static uint8_t getPalIndex(uint16_t rssi) {
   return ConvertDomain(Rssi2DBm(rssi), dBmRange.min, dBmRange.max, 0,
                        ARRAY_SIZE(GRADIENT_PALETTE) - 1);
+}
+
+static uint16_t v(uint8_t x) {
+  return noiseMax - Clamp(noiseHistory[x], 0, noiseMax);
 }
 
 static uint32_t ceilDiv(uint32_t a, uint32_t b) { return (a + b - 1) / b; }
@@ -97,7 +103,9 @@ void SP_AddPoint(Loot *msm) {
     x = historySize * currentStep / stepsCount + exIndex;
     if (ox != x) {
       rssiHistory[x] = markers[x] = 0;
+      noiseHistory[x] = UINT16_MAX;
       needRedraw[x] = false;
+      markers[x] = false;
       ox = x;
     }
     if (msm->rssi > rssiHistory[x]) {
@@ -156,18 +164,22 @@ static void SP_DrawTicks(uint8_t y, uint8_t h, FRange *range) {
 }
 
 void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
-  const uint16_t rssiMin = Min(rssiHistory, filledPoints);
+  /* const uint16_t rssiMin = Min(rssiHistory, filledPoints);
   const uint16_t noiseFloor = SP_GetNoiseFloor();
-  const uint16_t rssiMax = Max(rssiHistory, filledPoints);
+  const uint16_t rssiMax = Max(rssiHistory, filledPoints); */
+  const uint16_t rssiMin = noiseMax - Max(noiseHistory, filledPoints);
+  const uint16_t noiseFloor = noiseMax - Std(noiseHistory, filledPoints);
+  const uint16_t rssiMax = noiseMax - Min(noiseHistory, filledPoints);
+
   const uint16_t vMin = rssiMin - 1;
   const uint16_t vMax =
-      rssiMax + Clamp((rssiMax - noiseFloor), 40, rssiMax - noiseFloor);
+      rssiMax + Clamp((rssiMax - noiseFloor), 20, rssiMax - noiseFloor);
 
   dBmRange.min = Rssi2DBm(vMin);
   dBmRange.max = Rssi2DBm(vMax);
 
   for (uint8_t i = 0; i < filledPoints; i += exLen) {
-    uint8_t yVal = ConvertDomain(rssiHistory[i] * 2, vMin * 2, vMax * 2, 0, sh);
+    uint8_t yVal = ConvertDomain(v(i) * 2, vMin * 2, vMax * 2, 0, sh);
     if (yVal > py[i]) {
       py[i] = yVal;
     }
@@ -193,9 +205,9 @@ void WF_Render(bool wfDown, uint8_t skipLastN) {
 
     for (uint8_t i = 0; i < filledPoints; ++i) {
       if (i % 2 == 0) {
-        wf[0][i / 2] = getPalIndex(rssiHistory[i]);
+        wf[0][i / 2] = getPalIndex(v(i));
       } else {
-        wf[0][i / 2] |= getPalIndex(rssiHistory[i]) << 4;
+        wf[0][i / 2] |= getPalIndex(v(i)) << 4;
       }
     }
   }
