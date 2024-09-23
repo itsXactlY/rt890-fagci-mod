@@ -320,15 +320,13 @@ bool CUR_Size(bool up) {
   return false;
 }
 
-static uint32_t roundToStepDown(uint32_t f, uint32_t step) {
+static uint32_t roundToStep(uint32_t f, uint32_t step) {
   uint32_t sd = f % step;
-  f -= sd;
-  return f;
-}
-
-static uint32_t roundToStepUp(uint32_t f, uint32_t step) {
-  uint32_t sd = f % step;
-  f += step - sd;
+  if (sd > step / 2) {
+    f += step - sd;
+  } else {
+    f -= sd;
+  }
   return f;
 }
 
@@ -339,14 +337,14 @@ FRange CUR_GetRange(FRange *p, uint32_t step) {
       .end = ConvertDomainF(curX + curSbWidth, 0, MAX_POINTS - 1, p->start,
                             p->end),
   };
-  range.start = roundToStepDown(range.start, step);
-  range.end = roundToStepUp(range.end, step);
+  range.start = roundToStep(range.start, step);
+  range.end = roundToStep(range.end, step);
   return range;
 }
 
 uint32_t CUR_GetCenterF(FRange *p, uint32_t step) {
-  return roundToStepDown(
-      ConvertDomainF(curX, 0, MAX_POINTS - 1, p->start, p->end), step);
+  return roundToStep(ConvertDomainF(curX, 0, MAX_POINTS - 1, p->start, p->end),
+                     step);
 }
 
 void CUR_Reset() {
