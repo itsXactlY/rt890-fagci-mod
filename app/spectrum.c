@@ -20,6 +20,7 @@ static const uint16_t U16_MAX = 65535;
 
 static bool running;
 static uint32_t step;
+static uint32_t bw;
 static uint8_t stepIndex;
 static Loot msm;
 
@@ -91,33 +92,8 @@ void LOOT_Update(Loot *m) {
   item->rssi = m->rssi;
 
   if (item->open) {
-    // item->duration += gTimeSinceBoot - item->lastTimeCheck;
     gLastActiveLoot = item;
   }
-  if (m->open) {
-    /* uint32_t cd = 0;
-    uint16_t ct = 0;
-    uint8_t Code = 0; */
-    /* BK4819_CssScanResult_t res = BK4819_GetCxCSSScanResult(&cd, &ct);
-    switch (res) {
-    case BK4819_CSS_RESULT_CDCSS:
-      Code = DCS_GetCdcssCode(cd);
-      if (Code != 0xFF) {
-        item->cd = Code;
-      }
-      break;
-    case BK4819_CSS_RESULT_CTCSS:
-      Code = DCS_GetCtcssCode(ct);
-      if (Code != 0xFF) {
-        item->ct = Code;
-      }
-      break;
-    default:
-      break;
-    } */
-    // item->lastTimeOpen = gTimeSinceBoot;
-  }
-  // item->lastTimeCheck = gTimeSinceBoot;
   item->open = m->open;
   m->ct = item->ct;
   m->cd = item->cd;
@@ -201,13 +177,20 @@ static void drawF(uint32_t f, uint8_t x, uint8_t y, uint16_t color) {
   ShiftShortStringRight(2, 7);
   gShortString[3] = '.';
   gColorForeground = color;
+  gColorBackground = COLOR_BACKGROUND;
   UI_DrawSmallString(x, y, gShortString, 8);
   gColorForeground = COLOR_FOREGROUND;
+  gColorBackground = COLOR_BACKGROUND;
 }
 
 static const uint32_t NUM_TIMEOUT = 3000;
+static bool needRedrawNumbers = true;
 
 static void renderNumbers() {
+  if (!needRedrawNumbers) {
+    return;
+  }
+  needRedrawNumbers = false;
   if (gTimeSinceBoot - lastStarKeyTime < NUM_TIMEOUT) {
     DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
     Int2Ascii(delayMs, 2);
@@ -227,7 +210,6 @@ static void renderNumbers() {
     if (catch.f) {
       drawF(catch.f, 58, 2, COLOR_GREEN);
     } else {
-
       drawF(step, 58, 2, COLOR_FOREGROUND);
     }
 
@@ -238,7 +220,7 @@ static void renderNumbers() {
 
 static void render(bool wfDown) {
   SP_Render(rangePeek(), 62, 30);
-  WF_Render(wfDown, 0);
+  WF_Render(wfDown);
   CUR_Render(56);
 
   renderNumbers();
@@ -270,7 +252,7 @@ static void init() {
   catch.f = 0;
 
   msm.f = rangePeek()->start;
-  SP_Init((rangePeek()->end - rangePeek()->start) / step, 160);
+  SP_Init(rangePeek(), step, bw);
   CUR_Reset();
 
   running = true;
@@ -429,6 +411,7 @@ void StopSpectrum(void) {
   }
 
   RADIO_Tune(gSettings.CurrentVfo);
+  UI_SetColors(gExtendedSettings.DarkMode);
   UI_DrawMain(false);
 }
 
@@ -437,6 +420,7 @@ void APP_Spectrum(void) {
   RADIO_Tune(gSettings.CurrentVfo);
   uint32_t f1 = gVfoState[0].RX.Frequency;
   uint32_t f2 = gVfoState[1].RX.Frequency;
+  bw = gVfoState[gSettings.CurrentVfo].bIsNarrow ? 1250 : 2500;
 
   stepIndex = gSettings.FrequencyStep;
   step = FREQUENCY_GetStep(stepIndex);
@@ -461,6 +445,7 @@ void APP_Spectrum(void) {
       } else {
         render(false);
       }
+      needRedrawNumbers = true;
       DELAY_WaitMS(keyHold ? 5 : 300);
     }
   }

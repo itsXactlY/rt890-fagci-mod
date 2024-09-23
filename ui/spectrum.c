@@ -5,30 +5,33 @@
 #include <string.h>
 
 #define MAX_POINTS 160
-
-static const uint16_t noiseMax = 100;
+#define WF_XN 80
+#define WF_YN 45
 
 static uint16_t rssiHistory[MAX_POINTS] = {0};
 static uint16_t noiseHistory[MAX_POINTS] = {0};
 static bool markers[MAX_POINTS] = {0};
 static bool needRedraw[MAX_POINTS] = {0};
-static uint8_t x;
-static uint8_t historySize;
+static uint8_t x = 255;
 static uint8_t filledPoints;
 
 static uint32_t stepsCount;
 static uint32_t currentStep;
+static uint32_t step;
+static uint32_t bw;
 static uint8_t exLen;
+
+static FRange range;
 
 static DBmRange dBmRange = {-150, -40};
 
 static bool ticksRendered = false;
 
-static uint8_t wf[45][80] = {0};
-static uint16_t osy[160] = {0};
+static uint8_t wf[WF_YN][WF_XN] = {0};
+static uint16_t osy[MAX_POINTS] = {0};
 
-static uint16_t py[160] = {0};
-static uint16_t opy[160] = {0};
+static uint8_t curX = MAX_POINTS / 2;
+static uint8_t curSbWidth = 16;
 
 static const int16_t GRADIENT_PALETTE[] = {
     0x2000, 0x3000, 0x5000, 0x9000, 0xfc44, 0xffbf, 0x7bf, 0x1b5f,
@@ -40,9 +43,7 @@ static uint8_t getPalIndex(uint16_t rssi) {
                        ARRAY_SIZE(GRADIENT_PALETTE) - 1);
 }
 
-static uint16_t v(uint8_t x) {
-  return noiseMax - Clamp(noiseHistory[x], 0, noiseMax);
-}
+static uint16_t v(uint8_t x) { return rssiHistory[x]; }
 
 static uint32_t ceilDiv(uint32_t a, uint32_t b) { return (a + b - 1) / b; }
 
@@ -63,7 +64,7 @@ void SP_ResetHistory(void) {
     memset(wf[y], 0, ARRAY_SIZE(wf[0]));
   }
   for (uint8_t i = 0; i < MAX_POINTS; ++i) {
-    py[i] = opy[i] = osy[i] = rssiHistory[i] = 0;
+    osy[i] = rssiHistory[i] = 0;
     noiseHistory[i] = UINT16_MAX;
     markers[i] = false;
     needRedraw[i] = false;
@@ -87,58 +88,56 @@ void SP_Next(void) {
   }
 }
 
-void SP_Init(uint32_t steps, uint8_t width) {
+void SP_Init(FRange *r, uint32_t stepSize, uint32_t _bw) {
   filledPoints = 0;
-  stepsCount = steps;
-  historySize = width;
-  exLen = ceilDiv(historySize, stepsCount);
+  step = stepSize;
+  bw = _bw;
+  range = *r;
+  stepsCount = (r->end - r->start) / stepSize + 1;
+  exLen = ceilDiv(MAX_POINTS, stepsCount);
+  // todo: limit exLen to ConvertDomain bw
   SP_ResetHistory();
   SP_Begin();
   ticksRendered = false;
 }
 
-void SP_AddPoint(Loot *msm) {
-  uint8_t ox = 255;
-  for (uint8_t exIndex = 0; exIndex < exLen; ++exIndex) {
-    x = historySize * currentStep / stepsCount + exIndex;
-    if (ox != x) {
-      rssiHistory[x] = markers[x] = 0;
-      noiseHistory[x] = UINT16_MAX;
-      needRedraw[x] = false;
-      markers[x] = false;
-      ox = x;
-    }
-    if (msm->rssi > rssiHistory[x]) {
-      rssiHistory[x] = msm->rssi;
-      needRedraw[x] = true;
-    }
-    if (msm->noise < noiseHistory[x]) {
-      noiseHistory[x] = msm->noise;
-      needRedraw[x] = true;
-    }
-    if (markers[x] == false && msm->open) {
-      markers[x] = msm->open;
-    }
-  }
-  if (x > filledPoints && x < historySize) {
-    filledPoints = x + 1;
-  }
+static uint8_t f2x(uint32_t f) {
+  return ConvertDomain(f, range.start, range.end, 0, MAX_POINTS - 1);
 }
 
-void SP_ResetPoint(void) {
-  for (uint8_t exIndex = 0; exIndex < exLen; ++exIndex) {
-    uint8_t lx = historySize * currentStep / stepsCount + exIndex;
-    rssiHistory[lx] = 0;
-    noiseHistory[lx] = UINT16_MAX;
-    needRedraw[lx] = false;
-    markers[lx] = false;
+static uint8_t ox = 255;
+
+void SP_AddPoint(Loot *msm) {
+  x = f2x(msm->f);
+  uint8_t ex = f2x(msm->f + step);
+  if (ox != x) {
+    rssiHistory[x] = markers[x] = 0;
+    noiseHistory[x] = UINT16_MAX;
+    ox = x;
+  }
+  if (msm->rssi > rssiHistory[x]) {
+    rssiHistory[x] = msm->rssi;
+  }
+  if (msm->noise < noiseHistory[x]) {
+    noiseHistory[x] = msm->noise;
+  }
+  if (markers[x] == false && msm->open) {
+    markers[x] = msm->open;
+  }
+  for (uint8_t i = 0; i < ex - x; ++i) {
+    rssiHistory[x + i] = rssiHistory[x];
+    noiseHistory[x + i] = noiseHistory[x];
+    markers[x + i] = markers[x];
+  }
+  if (x > filledPoints && x < MAX_POINTS) {
+    filledPoints = x + 1;
   }
 }
 
 static void drawTicks(uint8_t y, uint32_t fs, uint32_t fe, uint32_t div,
                       uint8_t h, uint16_t c) {
   for (uint32_t f = fs - (fs % div) + div; f < fe; f += div) {
-    uint8_t x = ConvertDomainF(f, fs, fe, 0, 159);
+    uint8_t x = f2x(f);
     ST7735S_SetAddrWindow(x, y, x, y + h - 1);
     for (uint8_t yp = y; yp < y + h; ++yp) {
       ST7735S_SendU16(yp / 2 % 2 ? c : COLOR_BACKGROUND);
@@ -155,7 +154,7 @@ static void SP_DrawTicks(uint8_t y, uint8_t h, FRange *range) {
   // const uint16_t c2 = COLOR_GREY_DARK;
 
   for (uint32_t p = 100000000; p >= 10; p /= 10) {
-    if (bw > p) {
+    if (p < bw) {
       // drawTicks(y, fs, fe, p / 2, h, c2);
       drawTicks(y, fs, fe, p, h, c1);
       return;
@@ -163,75 +162,108 @@ static void SP_DrawTicks(uint8_t y, uint8_t h, FRange *range) {
   }
 }
 
+typedef struct {
+  uint8_t sx;
+  uint8_t w;
+  uint16_t v;
+} Bar;
+
+static Bar bar(uint16_t *data, uint8_t i) {
+  uint8_t sz = f2x(range.start + step) - f2x(range.start);
+  uint8_t szBw = f2x(range.start + bw) - f2x(range.start);
+
+  if (szBw < sz) {
+    sz = szBw;
+  }
+
+  uint8_t w = sz; // % 2 == 0 ? sz + 1 : sz;
+
+  int16_t sx = i - w / 2;
+  int16_t ex = i + w / 2;
+
+  if (sx < 0) {
+    w += sx;
+    sx = 0;
+  }
+
+  if (ex > MAX_POINTS) {
+    w -= ex - MAX_POINTS;
+  }
+  return (Bar){sx, w, data[i]};
+}
+
+static void renderBar(uint8_t sy, uint16_t *data, uint8_t i, bool fill) {
+  Bar b = bar(data, i);
+  DISPLAY_DrawRectangle1Nr(b.sx, sy, b.v, b.w,
+                           fill ? COLOR_FOREGROUND : COLOR_BACKGROUND);
+}
+
+static void renderWf(uint16_t *data, uint8_t i) {
+  Bar b = bar(data, i);
+  for (uint8_t i = b.sx; i < b.sx + b.w; ++i) {
+    if (i % 2 == 0) {
+      wf[0][i / 2] = getPalIndex(b.v);
+    } else {
+      wf[0][i / 2] &= 0x0F;
+      wf[0][i / 2] |= getPalIndex(b.v) << 4;
+    }
+  }
+}
+
 void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
-  /* const uint16_t rssiMin = Min(rssiHistory, filledPoints);
+  const uint16_t rssiMin = Min(rssiHistory, filledPoints);
   const uint16_t noiseFloor = SP_GetNoiseFloor();
-  const uint16_t rssiMax = Max(rssiHistory, filledPoints); */
-  const uint16_t rssiMin = noiseMax - Max(noiseHistory, filledPoints);
-  const uint16_t noiseFloor = noiseMax - Std(noiseHistory, filledPoints);
-  const uint16_t rssiMax = noiseMax - Min(noiseHistory, filledPoints);
+  const uint16_t rssiMax = Max(rssiHistory, filledPoints);
 
   const uint16_t vMin = rssiMin - 1;
   const uint16_t vMax =
-      rssiMax + Clamp((rssiMax - noiseFloor), 20, rssiMax - noiseFloor);
+      rssiMax + Clamp((rssiMax - noiseFloor), 40, rssiMax - noiseFloor);
 
   dBmRange.min = Rssi2DBm(vMin);
   dBmRange.max = Rssi2DBm(vMax);
 
-  for (uint8_t i = 0; i < filledPoints; i += exLen) {
+  for (uint32_t f = range.start; f <= range.end; f += step) {
+    uint8_t i = f2x(f);
     uint8_t yVal = ConvertDomain(v(i) * 2, vMin * 2, vMax * 2, 0, sh);
-    if (yVal > py[i]) {
-      py[i] = yVal;
-    }
-    if (yVal < osy[i]) {
-      DISPLAY_DrawRectangle1Nr(i, 62 + yVal, osy[i] - yVal, exLen,
-                               COLOR_BACKGROUND);
-    }
+    renderBar(sy, osy, i, false);
     osy[i] = yVal;
-    opy[i] = py[i];
   }
   SP_DrawTicks(sy, sh, p);
-  for (uint8_t i = 0; i < filledPoints; i += exLen) {
-    DISPLAY_DrawRectangle1Nr(i, sy, osy[i], exLen, COLOR_FOREGROUND);
+  for (uint32_t f = range.start; f <= range.end; f += step) {
+    renderBar(sy, osy, f2x(f), true);
   }
   DISPLAY_ResetWindow();
 }
 
-void WF_Render(bool wfDown, uint8_t skipLastN) {
+void WF_Render(bool wfDown) {
+  const uint8_t YN = ARRAY_SIZE(wf);
+  const uint8_t XN = ARRAY_SIZE(wf[0]);
   if (wfDown) {
-    for (uint8_t y = ARRAY_SIZE(wf) - 1; y > 0; --y) {
-      memcpy(wf[y], wf[y - 1], ARRAY_SIZE(wf[0]));
+    for (uint8_t y = YN - 1; y > 0; --y) {
+      memcpy(wf[y], wf[y - 1], XN);
     }
 
-    for (uint8_t i = 0; i < filledPoints; ++i) {
-      if (i % 2 == 0) {
-        wf[0][i / 2] = getPalIndex(v(i));
-      } else {
-        wf[0][i / 2] |= getPalIndex(v(i)) << 4;
-      }
+    memset(wf[0], 0, WF_XN);
+
+    for (uint32_t f = range.start; f <= range.end; f += step) {
+      renderWf(rssiHistory, f2x(f));
     }
   }
 
-  // const uint8_t YMAX = ARRAY_SIZE(wf) - skipLastN - 1;
+  ST7735S_SetAddrWindow(0, 11, MAX_POINTS - 1, 11 + YN - 1);
 
-  ST7735S_SetAddrWindow(0, 11, 159, 11 + ARRAY_SIZE(wf) - 1);
-
-  for (uint8_t x = 0; x < ARRAY_SIZE(wf[0]); ++x) {
-    for (int8_t y = ARRAY_SIZE(wf) - 1; y >= 0; --y) {
-      ST7735S_SendU16(y > ARRAY_SIZE(wf) - skipLastN
-                          ? COLOR_BACKGROUND
-                          : GRADIENT_PALETTE[wf[y][x] & 0xF]);
+  for (uint8_t x = 0; x < XN; ++x) {
+    for (int8_t y = YN - 1; y >= 0; --y) {
+      ST7735S_SendU16(GRADIENT_PALETTE[wf[y][x] & 0xF]);
     }
-    for (int8_t y = ARRAY_SIZE(wf) - 1; y >= 0; --y) {
-      ST7735S_SendU16(y > ARRAY_SIZE(wf) - skipLastN
-                          ? COLOR_BACKGROUND
-                          : GRADIENT_PALETTE[(wf[y][x] >> 4) & 0xF]);
+    for (int8_t y = YN - 1; y >= 0; --y) {
+      ST7735S_SendU16(GRADIENT_PALETTE[(wf[y][x] >> 4) & 0xF]);
     }
   }
 }
 
 void SP_RenderArrow(FRange *p, uint32_t f, uint8_t sx, uint8_t sy, uint8_t sh) {
-  uint8_t cx = ConvertDomainF(f, p->start, p->end, sx, sx + historySize - 1);
+  uint8_t cx = ConvertDomainF(f, p->start, p->end, sx, sx + MAX_POINTS - 1);
   DrawVLine(cx, sy, 4, COLOR_GREY);
   DISPLAY_DrawRectangle0(cx - 2, sy, 5, 2, COLOR_GREY);
 }
@@ -241,10 +273,8 @@ DBmRange SP_GetGradientRange() { return dBmRange; }
 uint16_t SP_GetNoiseFloor() { return Std(rssiHistory, filledPoints); }
 uint16_t SP_GetNoiseMax() { return Max(noiseHistory, filledPoints); }
 
-static uint8_t curX = 160 / 2;
-static uint8_t curSbWidth = 16;
 void CUR_Render(uint8_t y) {
-  DISPLAY_Fill(0, 159, y, y + 6 - 1, COLOR_BACKGROUND);
+  DISPLAY_Fill(0, MAX_POINTS - 1, y, y + 6 - 1, COLOR_BACKGROUND);
 
   y++;
   DISPLAY_Fill(curX - curSbWidth + 1, curX + curSbWidth - 1, y, y + 4 - 1,
@@ -262,7 +292,7 @@ void CUR_Render(uint8_t y) {
 
 bool CUR_Move(bool up) {
   if (up) {
-    if (curX + curSbWidth < 159) {
+    if (curX + curSbWidth < MAX_POINTS - 1) {
       curX++;
       return true;
     }
@@ -277,7 +307,7 @@ bool CUR_Move(bool up) {
 
 bool CUR_Size(bool up) {
   if (up) {
-    if (curX + curSbWidth < 159 && curX - curSbWidth > 0) {
+    if (curX + curSbWidth < MAX_POINTS - 1 && curX - curSbWidth > 0) {
       curSbWidth++;
       return true;
     }
@@ -304,8 +334,10 @@ static uint32_t roundToStepUp(uint32_t f, uint32_t step) {
 
 FRange CUR_GetRange(FRange *p, uint32_t step) {
   FRange range = {
-      .start = ConvertDomainF(curX - curSbWidth, 0, 159, p->start, p->end),
-      .end = ConvertDomainF(curX + curSbWidth, 0, 159, p->start, p->end),
+      .start = ConvertDomainF(curX - curSbWidth, 0, MAX_POINTS - 1, p->start,
+                              p->end),
+      .end = ConvertDomainF(curX + curSbWidth, 0, MAX_POINTS - 1, p->start,
+                            p->end),
   };
   range.start = roundToStepDown(range.start, step);
   range.end = roundToStepUp(range.end, step);
@@ -313,7 +345,8 @@ FRange CUR_GetRange(FRange *p, uint32_t step) {
 }
 
 uint32_t CUR_GetCenterF(FRange *p, uint32_t step) {
-  return roundToStepDown(ConvertDomainF(curX, 0, 159, p->start, p->end), step);
+  return roundToStepDown(
+      ConvertDomainF(curX, 0, MAX_POINTS - 1, p->start, p->end), step);
 }
 
 void CUR_Reset() {

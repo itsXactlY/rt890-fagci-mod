@@ -13,11 +13,11 @@ typedef struct {
 void SP_AddPoint(Loot *msm);
 void SP_ResetHistory();
 void SP_ResetRender();
-void SP_Init(uint32_t steps, uint8_t width);
+void SP_Init(FRange *r, uint32_t stepSize, uint32_t bw);
 void SP_Begin();
 void SP_Next();
 void SP_Render(FRange *p, uint8_t sy, uint8_t sh);
-void WF_Render(bool wfDown, uint8_t skipLastN);
+void WF_Render(bool wfDown);
 void CUR_Render(uint8_t y);
 bool CUR_Move(bool up);
 bool CUR_Size(bool up);
