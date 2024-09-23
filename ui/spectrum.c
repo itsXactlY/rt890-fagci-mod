@@ -109,11 +109,10 @@ static uint8_t ox = 255;
 
 void SP_AddPoint(Loot *msm) {
   x = f2x(msm->f);
-  uint8_t ex = f2x(msm->f + step);
   if (ox != x) {
+    ox = x;
     rssiHistory[x] = markers[x] = 0;
     noiseHistory[x] = UINT16_MAX;
-    ox = x;
   }
   if (msm->rssi > rssiHistory[x]) {
     rssiHistory[x] = msm->rssi;
@@ -124,10 +123,11 @@ void SP_AddPoint(Loot *msm) {
   if (markers[x] == false && msm->open) {
     markers[x] = msm->open;
   }
-  for (uint8_t i = 0; i < ex - x; ++i) {
-    rssiHistory[x + i] = rssiHistory[x];
-    noiseHistory[x + i] = noiseHistory[x];
-    markers[x + i] = markers[x];
+  const uint8_t XL = f2x(msm->f + step);
+  for (uint8_t nx = x + 1; nx < XL; ++nx) {
+    rssiHistory[nx] = rssiHistory[x];
+    noiseHistory[nx] = noiseHistory[x];
+    markers[nx] = markers[x];
   }
   if (x > filledPoints && x < MAX_POINTS) {
     filledPoints = x + 1;
@@ -174,6 +174,10 @@ static Bar bar(uint16_t *data, uint8_t i) {
 
   if (szBw < sz) {
     sz = szBw;
+  }
+
+  if (sz < 2) {
+    return (Bar){i, 1, data[i]};
   }
 
   uint8_t w = sz; // % 2 == 0 ? sz + 1 : sz;

@@ -265,6 +265,7 @@ static inline void toggleListening() {
     isListening = msm.open;
     if (isListening) {
       catch = msm;
+      needRedrawNumbers = true;
 
       BK4819_StartAudio();
     } else {
