@@ -180,7 +180,7 @@ static Bar bar(uint16_t *data, uint8_t i) {
     return (Bar){i, 1, data[i]};
   }
 
-  uint8_t w = sz; // % 2 == 0 ? sz + 1 : sz;
+  uint8_t w = sz % 2 == 0 ? sz + 1 : sz;
 
   int16_t sx = i - w / 2;
   int16_t ex = i + w / 2;

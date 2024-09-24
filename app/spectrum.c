@@ -16,18 +16,26 @@
 #include "radio.h"
 #include <stddef.h>
 
+typedef enum {
+  BB_FREQ,
+  BB_CURSOR,
+  BB_SET1,
+} BottomBar;
+
 static const uint16_t U16_MAX = 65535;
+static const uint32_t NUM_TIMEOUT = 3000;
 
 static bool running;
 static uint32_t step;
 static uint32_t bw;
 static uint8_t stepIndex;
 static Loot msm;
+static int8_t band = 0;
 
 static uint16_t rssiO = U16_MAX;
 static uint16_t noiseO = 0;
 
-static uint32_t lastRender = 0;
+static uint32_t lastRender;
 static uint8_t delayMs = 3;
 static bool hard = true;
 static uint16_t noiseOpenDiff = 14;
@@ -36,9 +44,15 @@ static Loot catch = {0};
 static bool isListening = false;
 
 static KEY_t LastKey;
+static uint32_t keyHoldTime;
+static bool keyHold = false;
+
 static uint32_t lastBatRender;
-static uint32_t lastStarKeyTime = 0;
-static uint32_t lastCursorTime = 0;
+static uint32_t lastActionTime;
+
+static bool needRedrawNumbers = true;
+
+static BottomBar bb = BB_FREQ;
 
 #define RANGES_STACK_SIZE 4
 static FRange rangesStack[RANGES_STACK_SIZE] = {0};
@@ -140,8 +154,6 @@ static void updateStats() {
 
 static bool isSquelchOpen() { return msm.rssi >= rssiO && msm.noise <= noiseO; }
 
-static int8_t band = 0;
-
 static inline void tuneTo(uint32_t f) {
   int8_t b = f >= 24000000 ? 1 : -1;
   if (b != band) {
@@ -183,29 +195,39 @@ static void drawF(uint32_t f, uint8_t x, uint8_t y, uint16_t color) {
   gColorBackground = COLOR_BACKGROUND;
 }
 
-static const uint32_t NUM_TIMEOUT = 3000;
-static bool needRedrawNumbers = true;
+static void setBB(BottomBar v) {
+  bb = v;
+  lastActionTime = gTimeSinceBoot;
+  needRedrawNumbers = true;
+}
 
 static void renderNumbers() {
+  if (bb != BB_FREQ && gTimeSinceBoot - lastActionTime > NUM_TIMEOUT) {
+    bb = BB_FREQ;
+    needRedrawNumbers = true;
+  }
   if (!needRedrawNumbers) {
     return;
   }
   needRedrawNumbers = false;
-  if (gTimeSinceBoot - lastStarKeyTime < NUM_TIMEOUT) {
+  switch (bb) {
+  case BB_SET1:
     DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
     Int2Ascii(delayMs, 2);
     UI_DrawSmallString(2, 2, gShortString, 2);
 
     Int2Ascii(noiseOpenDiff, 2);
     UI_DrawSmallString(160 - 11, 2, gShortString, 2);
-  } else if (gTimeSinceBoot - lastCursorTime < NUM_TIMEOUT) {
+    break;
+  case BB_CURSOR:
     DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
 
     FRange cursorBounds = CUR_GetRange(rangePeek(), step);
     drawF(cursorBounds.start, 2, 2, COLOR_YELLOW);
     drawF(CUR_GetCenterF(rangePeek(), step), 58, 2, COLOR_YELLOW);
     drawF(cursorBounds.end, 112, 2, COLOR_YELLOW);
-  } else {
+    break;
+  default:
     DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
     if (catch.f) {
       drawF(catch.f, 58, 2, COLOR_GREEN);
@@ -215,6 +237,7 @@ static void renderNumbers() {
 
     drawF(rangePeek()->start, 2, 2, COLOR_FOREGROUND);
     drawF(rangePeek()->end, 112, 2, COLOR_FOREGROUND);
+    break;
   }
 }
 
@@ -282,6 +305,7 @@ void Spectrum_Loop(void) {
 
   measure();
   SP_AddPoint(&msm);
+  renderNumbers();
   toggleListening();
 
   if (isListening) {
@@ -291,9 +315,6 @@ void Spectrum_Loop(void) {
 
   nextFreq();
 }
-
-static uint32_t keyHoldTime = 0;
-static bool keyHold = false;
 
 bool CheckKeys(void) {
   KEY_t key = KEY_GetButton();
@@ -319,28 +340,24 @@ bool CheckKeys(void) {
     case KEY_1:
       if (delayMs < 20) {
         delayMs++;
-        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
     case KEY_7:
       if (delayMs > 1) {
         delayMs--;
-        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
     case KEY_3:
       if (noiseOpenDiff < 40) {
         noiseOpenDiff++;
-        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
     case KEY_9:
       if (noiseOpenDiff > 1) {
         noiseOpenDiff--;
-        lastStarKeyTime = gTimeSinceBoot;
         return true;
       }
       return false;
@@ -438,15 +455,19 @@ void APP_Spectrum(void) {
   while (running) {
     Spectrum_Loop();
     while (CheckKeys()) {
+      needRedrawNumbers = true;
       if (LastKey == KEY_UP || LastKey == KEY_DOWN || LastKey == KEY_2 ||
           LastKey == KEY_8) {
         CUR_Render(56);
+        setBB(BB_CURSOR);
         renderNumbers();
-        lastCursorTime = gTimeSinceBoot;
+      } else if (LastKey == KEY_1 || LastKey == KEY_7 || LastKey == KEY_3 ||
+                 LastKey == KEY_9) {
+        setBB(BB_SET1);
+        renderNumbers();
       } else {
         render(false);
       }
-      needRedrawNumbers = true;
       DELAY_WaitMS(keyHold ? 5 : 300);
     }
   }
