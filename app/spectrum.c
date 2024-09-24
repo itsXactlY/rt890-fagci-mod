@@ -20,6 +20,7 @@ typedef enum {
   BB_FREQ,
   BB_CURSOR,
   BB_SET1,
+  BB_WATCH,
 } BottomBar;
 
 static const uint16_t U16_MAX = 65535;
@@ -29,7 +30,7 @@ static bool running;
 static uint32_t step;
 static uint32_t bw;
 static uint8_t stepIndex;
-static Loot msm;
+static Loot msm, msmCoursor;
 static int8_t band = 0;
 
 static uint16_t rssiO = U16_MAX;
@@ -182,6 +183,12 @@ static inline void measure() {
     msm.open = isSquelchOpen();
   }
   LOOT_Update(&msm);
+  if (CUR_GetCenterF(rangePeek(), step) == msm.f) {
+    msmCoursor = msm;
+    if (bb == BB_WATCH) {
+      needRedrawNumbers = true;
+    }
+  }
 }
 
 static void drawF(uint32_t f, uint8_t x, uint8_t y, uint16_t color) {
@@ -197,12 +204,13 @@ static void drawF(uint32_t f, uint8_t x, uint8_t y, uint16_t color) {
 
 static void setBB(BottomBar v) {
   bb = v;
-  lastActionTime = gTimeSinceBoot;
   needRedrawNumbers = true;
+  lastActionTime = gTimeSinceBoot;
 }
 
 static void renderNumbers() {
-  if (bb != BB_FREQ && gTimeSinceBoot - lastActionTime > NUM_TIMEOUT) {
+  if (bb != BB_FREQ && bb != BB_WATCH &&
+      gTimeSinceBoot - lastActionTime > NUM_TIMEOUT) {
     bb = BB_FREQ;
     needRedrawNumbers = true;
   }
@@ -226,6 +234,13 @@ static void renderNumbers() {
     drawF(cursorBounds.start, 2, 2, COLOR_YELLOW);
     drawF(CUR_GetCenterF(rangePeek(), step), 58, 2, COLOR_YELLOW);
     drawF(cursorBounds.end, 112, 2, COLOR_YELLOW);
+    break;
+  case BB_WATCH:
+    DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
+
+    Int2Ascii(msmCoursor.rssi, 3);
+    UI_DrawSmallString(2, 2, gShortString, 3);
+    drawF(msmCoursor.f, 58, 2, COLOR_YELLOW);
     break;
   default:
     DISPLAY_Fill(0, 159, 0, 10, COLOR_BACKGROUND);
@@ -392,6 +407,13 @@ bool CheckKeys(void) {
       catch.f = 0;
       nextFreq();
       return true;
+    case KEY_STAR:
+      if (bb == BB_WATCH) {
+        setBB(BB_FREQ);
+      } else {
+        setBB(BB_WATCH);
+      }
+      return true;
     case KEY_6:
       if (stepIndex < 13) {
         stepIndex++;
@@ -460,14 +482,13 @@ void APP_Spectrum(void) {
           LastKey == KEY_8) {
         CUR_Render(56);
         setBB(BB_CURSOR);
-        renderNumbers();
       } else if (LastKey == KEY_1 || LastKey == KEY_7 || LastKey == KEY_3 ||
                  LastKey == KEY_9) {
         setBB(BB_SET1);
-        renderNumbers();
       } else {
         render(false);
       }
+      renderNumbers();
       DELAY_WaitMS(keyHold ? 5 : 300);
     }
   }

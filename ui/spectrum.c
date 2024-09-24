@@ -198,8 +198,11 @@ static Bar bar(uint16_t *data, uint8_t i) {
 
 static void renderBar(uint8_t sy, uint16_t *data, uint8_t i, bool fill) {
   Bar b = bar(data, i);
-  DISPLAY_DrawRectangle1Nr(b.sx, sy, b.v, b.w,
-                           fill ? COLOR_FOREGROUND : COLOR_BACKGROUND);
+  if (needRedraw[i]) {
+    needRedraw[i] = false;
+    DISPLAY_DrawRectangle1Nr(b.sx, sy, b.v, b.w,
+                             fill ? COLOR_FOREGROUND : COLOR_BACKGROUND);
+  }
 }
 
 static void renderWf(uint16_t *data, uint8_t i) {
@@ -226,6 +229,8 @@ void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
   dBmRange.min = Rssi2DBm(vMin);
   dBmRange.max = Rssi2DBm(vMax);
 
+  memset(needRedraw, true, MAX_POINTS);
+
   for (uint32_t f = range.start; f <= range.end; f += step) {
     uint8_t i = f2x(f);
     uint8_t yVal = ConvertDomain(v(i) * 2, vMin * 2, vMax * 2, 0, sh);
@@ -233,6 +238,7 @@ void SP_Render(FRange *p, uint8_t sy, uint8_t sh) {
     osy[i] = yVal;
   }
   SP_DrawTicks(sy, sh, p);
+  memset(needRedraw, true, MAX_POINTS);
   for (uint32_t f = range.start; f <= range.end; f += step) {
     renderBar(sy, osy, f2x(f), true);
   }

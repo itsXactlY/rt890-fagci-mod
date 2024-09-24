@@ -27,11 +27,7 @@
 
 enum {
   GPIO_FILTER_UHF = 1U << 5,
-#ifdef PCB_VER_2_1
-  GPIO_FILTER_VHF = 1U << 3,
-#else
-  GPIO_FILTER_VHF = 1U << 6,
-#endif
+  GPIO_FILTER_VHF = (1U << 3) | (1U << 6),
   GPIO_FILTER_UNKWOWN = 1U << 7,
 };
 
@@ -446,14 +442,8 @@ void BK4819_SetFilterBandwidth(bool bIsNarrow) {
 #ifndef ENABLE_REGISTER_EDIT
     if (bIsNarrow) {
       BK4819_WriteRegister(0x43, 0x4048); // stock
-      // BK4819_WriteRegister(0x43, 0x7B08); //kamil/fagci
-      // BK4819_WriteRegister(0x43, 0x1408);
-      // BK4819_WriteRegister(0x43, 0x4408); //egzumer
     } else {
       BK4819_WriteRegister(0x43, 0x3028); // stock
-      // BK4819_WriteRegister(0x43, 0x7B08); //kamil/fagci
-      // BK4819_WriteRegister(0x43, 0x1408);
-      // BK4819_WriteRegister(0x43, 0x45A8); //egzumer
     }
 #else
     uint16_t Value = BK4819_ReadRegister(0x43);
@@ -540,17 +530,16 @@ void BK4819_EnableVox(bool bEnable) {
 }
 
 void BK4819_RestoreGainSettings() {
-  /* Keep for now, may be useful for register editing
-  const uint8_t orig_lna_short = 2;
-      const uint8_t orig_lna = 5;
-      const uint8_t orig_mixer = 2;
-      const uint8_t orig_pga = 5;
-                  if(BK4819_ReadRegister(0x13) != ((orig_lna_short << 8) |
-  (orig_lna << 5) | (orig_mixer << 3) | (orig_pga << 0))) {
-          BK4819_WriteRegister(0x13, (orig_lna_short << 8) | (orig_lna << 5) |
-  (orig_mixer << 3) | (orig_pga << 0));
-                  }
-  */
+  // Keep for now, may be useful for register editing
+  /* const uint8_t orig_lna_short = 2;
+  const uint8_t orig_lna = 5;
+  const uint8_t orig_mixer = 2;
+  const uint8_t orig_pga = 5;
+  if (BK4819_ReadRegister(0x13) != ((orig_lna_short << 8) | (orig_lna << 5) |
+                                    (orig_mixer << 3) | (orig_pga << 0))) {
+    BK4819_WriteRegister(0x13, (orig_lna_short << 8) | (orig_lna << 5) |
+                                   (orig_mixer << 3) | (orig_pga << 0));
+  } */
 
   // Default values
   /* BK4819_WriteRegister(0x10, 0x0038);
